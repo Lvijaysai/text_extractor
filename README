@@ -1,10 +1,10 @@
 
----
+```
 ## VisionOCR: AI-Powered Document Scanner
 
 **VisionOCR** is a full-stack web application that allows users to upload images of documents and instantly extract text using local AI processing. Built with a robust Django backend and a modern React frontend, it features a clean dashboard interface and privacy-focused local execution.
 
----
+```
 
 ## 🚀 Key Features
 
@@ -37,7 +37,7 @@ Follow these steps to run the project locally.
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/nvysion46/text_extractor.git](https://github.com/nvysion46/text_extractor.git)
+git clone 
 cd text_extractor
 
 ```
