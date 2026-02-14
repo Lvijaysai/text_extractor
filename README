@@ -1,7 +1,4 @@
 
-```
-
-```
 # VisionOCR: AI-Powered Document Scanner
 
 **VisionOCR** is a full-stack web application that allows users to upload images of documents and instantly extract text using local AI processing. Built with a robust Django backend and a modern React frontend, it features a clean dashboard interface and privacy-focused local execution.
@@ -13,8 +10,6 @@
 * **🖥️ Modern Dashboard:** A responsive React UI for uploading files and viewing results side-by-side.
 * **⚡ Real-Time Feedback:** Instant status updates and error handling.
 * **📝 Paragraph Optimization:** Intelligent text post-processing to group words into readable paragraphs.
-
----
 
 ## 🛠️ Tech Stack
 
@@ -29,7 +24,6 @@
 * **HTTP Client:** Axios
 * **Styling:** CSS3 (Custom Dashboard Design)
 
----
 
 ## ⚙️ Installation & Setup
 
