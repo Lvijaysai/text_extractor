@@ -1,0 +1,72 @@
+/* frontend/src/App.css */
+.App {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f4f7f6;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #2d3436;
+  color: white;
+  padding: 20px;
+}
+
+.content {
+  flex: 1;
+  padding: 40px;
+}
+
+.upload-card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.upload-label {
+  padding: 10px 20px;
+  background: #eee;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-right: 15px;
+}
+
+.scan-button {
+  padding: 10px 25px;
+  background: #6c5ce7;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.pane {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  min-height: 400px;
+}
+
+.pane img {
+  max-width: 100%;
+  border-radius: 5px;
+}
+
+.text-output pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background: #fdfdfd;
+  padding: 15px;
+  border: 1px solid #eee;
+}

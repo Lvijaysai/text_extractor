@@ -1,0 +1,47 @@
+# --- Python / Django ---
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+media/
+db.sqlite3
+.python-version
+
+# --- Node / React ---
+node_modules/
+frontend/node_modules/
+/build
+/frontend/build
+.pnp
+.pnp.js
+coverage/
+frontend/coverage/
+
+# --- Environment Secrets ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# --- System / IDE ---
+.DS_Store
+.vscode/
+.idea/
+Thumbs.
+
+venv/
+node_modules/
+frontend/node_modules/
+db.sqlite3
+__pycache__/
+media/
