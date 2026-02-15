@@ -1,72 +1,132 @@
-/* frontend/src/App.css */
-.App {
-  display: flex;
-  min-height: 100vh;
-  background-color: #f4f7f6;
+/*frontend/src/App.css*/
+/* Clean Reset */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f4f6f8;
 }
 
-.sidebar {
-  width: 250px;
-  background-color: #2d3436;
+.app-header {
+  background: #2c3e50;
   color: white;
-  padding: 20px;
-}
-
-.content {
-  flex: 1;
-  padding: 40px;
-}
-
-.upload-card {
-  background: white;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  margin-bottom: 30px;
+  padding: 1rem 2rem;
   text-align: center;
 }
 
-.upload-label {
-  padding: 10px 20px;
-  background: #eee;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-right: 15px;
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
-.scan-button {
-  padding: 10px 25px;
-  background: #6c5ce7;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+/* Upload Controls */
+.upload-section {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.btn-upload, .btn-scan {
+  padding: 12px 24px;
+  border-radius: 6px;
   font-weight: bold;
+  cursor: pointer;
+  border: none;
 }
 
-.grid {
+.btn-upload { background: #dfe6e9; color: #333; }
+.btn-scan { background: #00b894; color: white; }
+.btn-scan:disabled { background: #b2bec3; cursor: not-allowed; }
+
+/* Grid Layout */
+.results-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 }
 
-.pane {
+.card {
   background: white;
   padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  min-height: 400px;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.pane img {
-  max-width: 100%;
-  border-radius: 5px;
+.image-box img {
+  width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+  border: 1px solid #ddd;
 }
 
-.text-output pre {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  background: #fdfdfd;
-  padding: 15px;
-  border: 1px solid #eee;
+.placeholder { color: #aaa; text-align: center; padding: 50px 0; }
+
+/* Data Table - High Accuracy UI Theme */
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 15px;
+  border: 2px solid #2c3e50;
+  border-radius: 4px;
 }
+
+.info-table th {
+  text-align: left;
+  background: #2c3e50;
+  color: white;
+  padding: 10px;
+  border-bottom: 2px solid #dee2e6;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.info-table td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.info-table .label {
+  font-weight: bold;
+  color: #555;
+  width: 35%;
+}
+
+.value {
+  font-family: 'Courier New', monospace; /* Monospace for alignment */
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #2d3436;
+}
+
+/* Accuracy Badges */
+.badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: bold;
+}
+
+.accuracy .badge {
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+  padding: 6px;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.badge.high { 
+  background: #00b894; /* Vivid Emerald Green */
+  color: white; 
+  box-shadow: 0 0 10px rgba(0, 184, 148, 0.3);
+} 
+
+.badge.low { 
+  background: #fab1a0; /* Warning Peach */
+  color: #c0392b; 
+}
+
+.warning { color: #d63031; background: #ffeaa7; padding: 10px; border-radius: 4px; }
+.raw-text { background: #f1f1f1; padding: 10px; overflow-x: auto; font-size: 0.9em; }

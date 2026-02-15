@@ -1,3 +1,4 @@
+//frontend/src/App.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import './App.css';
@@ -5,14 +6,18 @@ import './App.css';
 function App() {
   const [file, setFile] = useState(null);
   const [text, setText] = useState("");
+  const [extractedData, setExtractedData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
 
   const onFileChange = (e) => {
     const selected = e.target.files[0];
+    if (!selected) return;
     setFile(selected);
     setPreview(URL.createObjectURL(selected));
-    setText(""); 
+    // Reset output
+    setText("");
+    setExtractedData(null);
   };
 
   const onUpload = async () => {
@@ -23,75 +28,97 @@ function App() {
     formData.append("image", file);
 
     try {
+      // Ensure this URL matches your Django terminal output
       const res = await axios.post("http://127.0.0.1:8000/api/scan/", formData);
       
-      // --- OPTIMIZATION START ---
-      // Fix common OCR glitches before displaying text
-      let cleanText = res.data.text;
-      
-      // 1. Remove weird "pipe" characters often found in dictionary scans
-      if (cleanText) {
-        cleanText = cleanText.replace(/\|/g, "");
-        
-        // 2. Fix multiple spaces turning into huge gaps
-        cleanText = cleanText.replace(/ +/g, " ");
-      }
-      // --- OPTIMIZATION END ---
-
-      setText(cleanText);
+      setText(res.data.text);
+      setExtractedData(res.data.data);
     } catch (err) {
       console.error(err);
-      alert("Scanning failed. Make sure Django is running.");
+      alert("Scanning failed. Check Django console for errors.");
     }
     setLoading(false);
   };
 
   return (
     <div className="App">
-      {/* Sidebar Section */}
-      <div className="sidebar">
-        <h2>VisionOCR</h2>
-        <p style={{ opacity: 0.7 }}>Local AI Scanner</p>
-        <div style={{ marginTop: '30px' }}>
-          <small>Status:</small>
-          <br />
-          <span style={{ color: '#00b894', fontWeight: 'bold' }}>● System Online</span>
-        </div>
-      </div>
+      {/* Header */}
+      <header className="app-header">
+        <h1>VisionOCR</h1>
+      </header>
       
-      {/* Main Content Area */}
-      <div className="content">
-        <h1 style={{ marginBottom: '20px', color: '#333' }}>Dashboard</h1>
-
-        {/* Upload Card */}
-        <div className="upload-card">
-          <input type="file" onChange={onFileChange} accept="image/*" id="file-upload" hidden />
-          <label htmlFor="file-upload" className="upload-label">
-            {file ? file.name : "📁 Choose Document"}
+      <div className="container">
+        {/* Upload Section */}
+        <div className="upload-section">
+          <input type="file" onChange={onFileChange} accept="image/*" id="file" hidden />
+          <label htmlFor="file" className="btn-upload">
+             {file ? file.name : "📁 Select Image"}
           </label>
-          <button onClick={onUpload} className="scan-button" disabled={!file || loading}>
-            {loading ? "Processing..." : "⚡ Extract Text"}
+          <button onClick={onUpload} className="btn-scan" disabled={!file || loading}>
+            {loading ? "Processing..." : "Extract Data"}
           </button>
         </div>
 
-        {/* Results Grid */}
-        <div className="grid">
-          <div className="pane">
-            <h3>Document Preview</h3>
-            <div style={{ marginTop: '15px' }}>
+        <div className="results-grid">
+          {/* Left: Image Preview */}
+          <div className="card">
+            <h3>Original Document</h3>
+            <div className="image-box">
               {preview ? (
                 <img src={preview} alt="Preview" />
               ) : (
-                <div style={{ padding: '40px', color: '#aaa' }}>No document selected</div>
+                <p className="placeholder">No image selected</p>
               )}
             </div>
           </div>
 
-          <div className="pane">
+          {/* Right: Extracted Data */}
+          <div className="card">
             <h3>Extracted Information</h3>
-            <div className="text-output" style={{ marginTop: '15px' }}>
-              {text ? <pre>{text}</pre> : <div style={{ padding: '40px', color: '#aaa' }}>Text will appear here...</div>}
-            </div>
+            
+            {extractedData && extractedData.fields ? (
+              <div className="data-box">
+                <table className="info-table">
+                  <thead>
+                    <tr>
+                      <th>Field</th>
+                      <th>Extracted Value</th>
+                      <th>Model Accuracy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(extractedData.fields).map(([key, val]) => (
+                      <tr key={key}>
+                        <td className="label">{key}</td>
+                        <td className="value">{val.text}</td>
+                        <td className="accuracy">
+                          <span className={`badge ${val.accuracy > 80 ? 'high' : 'low'}`}>
+                            {val.accuracy}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* Dates Found section (if available) */}
+                {extractedData.dates && extractedData.dates.length > 0 && (
+                  <div className="extra-info" style={{ marginTop: '20px' }}>
+                    <strong>Dates Found:</strong> {extractedData.dates.join(", ")}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="placeholder">No data extracted yet.</p>
+            )}
+
+            {/* Raw Text Fallback */}
+            <details style={{ marginTop: '20px' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 'bold', color: '#2c3e50' }}>
+                View Raw Text
+              </summary>
+              <pre className="raw-text">{text}</pre>
+            </details>
           </div>
         </div>
       </div>
