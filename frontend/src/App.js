@@ -1,126 +1,138 @@
-//frontend/src/App.js
 import React, { useState } from 'react';
 import axios from 'axios';
-import './App.css';
+import './App.css'; // Make sure this file exists!
 
 function App() {
-  const [file, setFile] = useState(null);
-  const [text, setText] = useState("");
-  const [extractedData, setExtractedData] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [ocrData, setOcrData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [detectionImage, setDetectionImage] = useState(null);
 
-  const onFileChange = (e) => {
-    const selected = e.target.files[0];
-    if (!selected) return;
-    setFile(selected);
-    setPreview(URL.createObjectURL(selected));
-    // Reset output
-    setText("");
-    setExtractedData(null);
+  // Define your Django Server URL here to fix broken images
+  const API_BASE_URL = "http://127.0.0.1:8000";
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreview(URL.createObjectURL(file));
+      setOcrData(null);       // Reset old data
+      setDetectionImage(null); // Reset old image
+    }
   };
 
-  const onUpload = async () => {
-    if (!file) return;
+  const handleScan = async () => {
+    if (!selectedFile) return;
     setLoading(true);
-    
+
     const formData = new FormData();
-    formData.append("image", file);
+    formData.append('image', selectedFile);
 
     try {
-      // Ensure this URL matches your Django terminal output
-      const res = await axios.post("http://127.0.0.1:8000/api/scan/", formData);
+      const response = await axios.post(`${API_BASE_URL}/api/scan/`, formData);
+      console.log("Server Response:", response.data);
+
+      setOcrData(response.data.data);
       
-      setText(res.data.text);
-      setExtractedData(res.data.data);
-    } catch (err) {
-      console.error(err);
-      alert("Scanning failed. Check Django console for errors.");
+      // FIX: Prepend the Django Server URL so the image loads
+      if (response.data.detection_image) {
+        setDetectionImage(API_BASE_URL + response.data.detection_image);
+      }
+      
+    } catch (error) {
+      console.error("Error scanning:", error);
+      alert("Scan failed! Is the backend running?");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="App">
-      {/* Header */}
+    <div className="app-container">
+      {/* 1. Professional Header */}
       <header className="app-header">
-        <h1>VisionOCR</h1>
+        <h1>🖊️ VisionOCR: Handwriting Scanner</h1>
       </header>
-      
-      <div className="container">
-        {/* Upload Section */}
-        <div className="upload-section">
-          <input type="file" onChange={onFileChange} accept="image/*" id="file" hidden />
-          <label htmlFor="file" className="btn-upload">
-             {file ? file.name : "📁 Select Image"}
-          </label>
-          <button onClick={onUpload} className="btn-scan" disabled={!file || loading}>
-            {loading ? "Processing..." : "Extract Data"}
-          </button>
+
+      <div className="main-layout">
+        
+        {/* 2. Upload Card */}
+        <div className="card upload-card">
+          <h3>1. Upload Document</h3>
+          <div className="upload-controls">
+            <input 
+              type="file" 
+              id="fileInput"
+              onChange={handleFileChange} 
+              accept="image/*" 
+              style={{ display: 'none' }} 
+            />
+            <label htmlFor="fileInput" className="btn btn-outline">
+              {selectedFile ? selectedFile.name : "📁 Choose Image"}
+            </label>
+            
+            <button 
+              onClick={handleScan} 
+              disabled={!selectedFile || loading}
+              className="btn btn-primary"
+            >
+              {loading ? "⏳ Scanning..." : "🚀 Extract Text"}
+            </button>
+          </div>
         </div>
 
-        <div className="results-grid">
-          {/* Left: Image Preview */}
-          <div className="card">
-            <h3>Original Document</h3>
-            <div className="image-box">
-              {preview ? (
-                <img src={preview} alt="Preview" />
+        <div className="content-grid">
+          {/* 3. Image Viewer (Left) */}
+          <div className="card image-card">
+            <h3>Document View</h3>
+            <div className="image-frame">
+              {/* Logic: Show Detection Image if available, otherwise Original */}
+              {detectionImage ? (
+                <img src={detectionImage} alt="AI Analysis" className="doc-image" />
+              ) : preview ? (
+                <img src={preview} alt="Preview" className="doc-image" />
               ) : (
-                <p className="placeholder">No image selected</p>
+                <div className="placeholder-text">No image selected</div>
               )}
             </div>
+            {detectionImage && <p className="caption">✅ Green boxes indicate detected text</p>}
           </div>
 
-          {/* Right: Extracted Data */}
-          <div className="card">
-            <h3>Extracted Information</h3>
-            
-            {extractedData && extractedData.fields ? (
-              <div className="data-box">
-                <table className="info-table">
-                  <thead>
-                    <tr>
-                      <th>Field</th>
-                      <th>Extracted Value</th>
-                      <th>Model Accuracy</th>
+          {/* 4. Results Table (Right) */}
+          <div className="card results-card">
+            <h3>Extracted Data</h3>
+            {ocrData ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Row ID</th>
+                    <th>Detected Text</th>
+                    <th>Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(ocrData).map(([key, value]) => (
+                    <tr key={key}>
+                      <td className="row-id">{key}</td>
+                      <td className="ocr-text">{value.text}</td>
+                      <td>
+                        <span className={`badge ${value.accuracy > 80 ? 'good' : 'avg'}`}>
+                          {value.accuracy}%
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(extractedData.fields).map(([key, val]) => (
-                      <tr key={key}>
-                        <td className="label">{key}</td>
-                        <td className="value">{val.text}</td>
-                        <td className="accuracy">
-                          <span className={`badge ${val.accuracy > 80 ? 'high' : 'low'}`}>
-                            {val.accuracy}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {/* Dates Found section (if available) */}
-                {extractedData.dates && extractedData.dates.length > 0 && (
-                  <div className="extra-info" style={{ marginTop: '20px' }}>
-                    <strong>Dates Found:</strong> {extractedData.dates.join(", ")}
-                  </div>
-                )}
-              </div>
+                  ))}
+                </tbody>
+              </table>
             ) : (
-              <p className="placeholder">No data extracted yet.</p>
+              <div className="empty-state">
+                <p>Upload a form and click "Extract" to see results here.</p>
+              </div>
             )}
-
-            {/* Raw Text Fallback */}
-            <details style={{ marginTop: '20px' }}>
-              <summary style={{ cursor: 'pointer', fontWeight: 'bold', color: '#2c3e50' }}>
-                View Raw Text
-              </summary>
-              <pre className="raw-text">{text}</pre>
-            </details>
           </div>
         </div>
+
       </div>
     </div>
   );

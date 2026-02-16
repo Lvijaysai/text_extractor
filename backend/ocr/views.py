@@ -1,119 +1,186 @@
-#backend/ocr/views.py
 import cv2
 import numpy as np
 import easyocr
 import re
+import os
+import traceback
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from django.utils.text import get_valid_filename
 from .serializers import FileSerializer
 
-# Initialize reader with high-accuracy mode
-reader = easyocr.Reader(['en'])
+# ---------------------------------------------------------
+# 1. INITIALIZATION
+# ---------------------------------------------------------
+# 'en' for English. gpu=False is slower but safer if you don't have CUDA.
+print("⏳ Initializing EasyOCR Engine...")
+reader = easyocr.Reader(['en'], gpu=False)
+print("✅ EasyOCR Ready.")
 
 class OCRView(APIView):
-    def preprocess_for_maximum_accuracy(self, image_path):
-        """
-        Specialized cleaning for handwritten forms.
-        """
-        img = cv2.imread(image_path)
-        
-        # 1. Upscale significantly (4x) so small boxes become clear
-        img = cv2.resize(img, None, fx=4, fy=4, interpolation=cv2.INTER_LANCZOS4)
-        
-        # 2. Convert to Grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
-        # 3. Increase Contrast: Make ink blacker and paper whiter
-        alpha = 1.5 # Contrast control
-        beta = -50  # Brightness control
-        adjusted = cv2.convertScaleAbs(gray, alpha=alpha, beta=beta)
+    def strip_extensions(self, filename):
+        name = filename
+        while True:
+            name, ext = os.path.splitext(name)
+            if not ext: break
+        return name
 
-        # 4. Remove Box Lines (Vertical/Horizontal)
-        # We use a threshold to find the black lines of the boxes
-        thresh = cv2.threshold(adjusted, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-        
-        # Identify lines
-        horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (80, 1))
-        vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 80))
-        
-        remove_h = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
-        remove_v = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
-        
-        # Create mask of lines to delete
-        mask = cv2.add(remove_h, remove_v)
-        
-        # Use Inpainting or White-out to remove the grid lines
-        # This prevents the '|' symbol from being read as 'I'
-        img_final = cv2.cvtColor(adjusted, cv2.COLOR_GRAY2BGR)
-        img_final[mask > 0] = (255, 255, 255)
-        
-        return img_final
+    # ---------------------------------------------------------
+    # 2. PREPROCESSING (Simpler is Better)
+    # ---------------------------------------------------------
+    def preprocess_handwriting(self, image_path):
+        """
+        Does NOT remove lines (which deletes text).
+        Instead, zooms in so the AI sees boxes as 'borders' not 'text'.
+        """
+        try:
+            img = cv2.imread(image_path)
+            if img is None: return None, None
 
+            # Upscale 2.5x: This makes each grid box huge, separating letters clearly
+            img = cv2.resize(img, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+
+            # Grayscale
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+            # Denoise: gentle smoothing to remove paper grain
+            denoised = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
+
+            # Contrast Stretch (Normalizing brightness)
+            # This helps if the photo was taken in bad lighting
+            norm_img = np.zeros((denoised.shape[0], denoised.shape[1]))
+            final_img = cv2.normalize(denoised, norm_img, 0, 255, cv2.NORM_MINMAX)
+
+            # SAVE DEBUG IMAGE (So you can see what the AI sees)
+            base_name = self.strip_extensions(os.path.basename(image_path))
+            debug_name = f"debug_input_{base_name}.jpg"
+            debug_dir = os.path.dirname(image_path)
+            debug_path = os.path.join(debug_dir, debug_name)
+            cv2.imwrite(debug_path, final_img)
+            
+            # Construct URL for the frontend
+            rel_path = os.path.relpath(debug_path, settings.MEDIA_ROOT)
+            debug_url = f"{settings.MEDIA_URL}{rel_path}".replace("\\", "/")
+
+            return final_img, debug_url
+        except Exception as e:
+            print(f"Error in preprocessing: {e}")
+            return None, None
+
+    # ---------------------------------------------------------
+    # 3. MAIN LOGIC
+    # ---------------------------------------------------------
     def post(self, request, *args, **kwargs):
         serializer = FileSerializer(data=request.data)
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        # Handle file names
+        file_obj = request.FILES['image']
+        clean_name = self.strip_extensions(get_valid_filename(file_obj.name))
+        file_obj.name = f"{clean_name}.jpg"
+        
+        try:
             serializer.save()
             img_path = serializer.instance.image.path
             
-            # 1. Apply High-Precision Preprocessing
-            clean_img = self.preprocess_and_debug(img_path)
-            
-            # 2. Run OCR with 'Optimal Search' parameters
-            # beamWidth: higher = more accurate but slower
-            # min_size: prevents reading tiny dust specs as text
+            # A. PREPROCESS
+            processed_img, debug_url = self.preprocess_handwriting(img_path)
+            if processed_img is None:
+                return Response({"error": "Image processing failed"}, status=500)
+
+            print(f"\n🚀 Scanning: {file_obj.name}")
+
+            # B. EASYOCR INFERENCE (Tuned for Boxed Handwriting)
             results = reader.readtext(
-                clean_img, 
-                detail=1, 
-                paragraph=False,
-                beamWidth=15, 
-                contrast_ths=0.1,
-                adjust_contrast=0.7,
-                text_threshold=0.6,
-                low_text=0.4
+                processed_img,
+                detail=1,
+                
+                # CRITICAL SETTINGS FOR FORMS:
+                paragraph=False,      # Treat every box as separate text
+                canvas_size=2560,     # Allow processing larger (upscaled) images
+                mag_ratio=1.5,        # Zoom in further internally
+                
+                # SENSITIVITY SETTINGS:
+                text_threshold=0.3,   # Lower = detect fainter handwriting
+                low_text=0.2,         # Keep low-confidence text (don't discard)
+                link_threshold=0.1,   # Don't try to merge text across far-away boxes
+                
+                # DECODER:
+                decoder='greedy'      # 'greedy' is often better for simple block letters than 'beamsearch'
             )
 
-            # 3. Group fragments by line for better readability
-            lines = {}
+            # C. VISUALIZATION (Draw Green Boxes)
+            vis_img = cv2.cvtColor(processed_img, cv2.COLOR_GRAY2BGR)
             for (bbox, text, prob) in results:
-                y_center = int(sum([p[1] for p in bbox]) / 4)
-                found = False
-                for existing_y in lines.keys():
-                    if abs(existing_y - y_center) < 30: # 30px tolerance
-                        lines[existing_y].append((bbox[0][0], text, prob))
-                        found = True
-                        break
-                if not found:
-                    lines[y_center] = [(bbox[0][0], text, prob)]
+                # bbox = [[tl], [tr], [br], [bl]]
+                tl = tuple(map(int, bbox[0]))
+                br = tuple(map(int, bbox[2]))
+                cv2.rectangle(vis_img, tl, br, (0, 255, 0), 3) # Green Box
+            
+            vis_name = f"vis_{clean_name}.jpg"
+            vis_path = os.path.join(os.path.dirname(img_path), vis_name)
+            cv2.imwrite(vis_path, vis_img)
+            vis_url = f"{settings.MEDIA_URL}documents/{vis_name}".replace("\\", "/")
 
+            # D. DATA STRUCTURING
             extracted_fields = {}
+            lines = {}
+
+            for (bbox, text, prob) in results:
+                y_center = int((bbox[0][1] + bbox[2][1]) / 2)
+                x_start = int(bbox[0][0])
+                
+                # Group text into "Rows" based on Y-position (within 40px tolerance)
+                matched_row = None
+                for existing_y in lines:
+                    if abs(existing_y - y_center) < 40:
+                        matched_row = existing_y
+                        break
+                
+                if matched_row:
+                    lines[matched_row].append((x_start, text, prob))
+                else:
+                    lines[y_center] = [(x_start, text, prob)]
+
+            # Clean and sort the rows
             for idx, y in enumerate(sorted(lines.keys())):
-                # Sort words from left to right on each line
-                sorted_line = sorted(lines[y], key=lambda x: x[0])
+                # Sort row by X position (left to right)
+                sorted_row = sorted(lines[y], key=lambda item: item[0])
                 
-                # Combine text and filter out noise
-                text_val = " ".join([it[1] for it in sorted_line]).strip().upper()
-                avg_acc = sum([it[2] for it in sorted_line]) / len(sorted_line)
+                # Join text (e.g. "G" "A" "N" -> "GAN")
+                raw_text = " ".join([item[1] for item in sorted_row]).upper()
                 
-                # Filter: Only keep lines that have real data (not just single dots or lines)
-                if len(text_val) > 2:
-                    # Specific Form 49A fixes:
-                    # Merging [G][A][N][G][A] -> GANGA
-                    text_val = text_val.replace(" ", "") if len(text_val) < 15 else text_val
-                    
+                # Filter: Keep only letters, numbers, and basic symbols
+                clean_text = re.sub(r'[^A-Z0-9\-\.\/]', ' ', raw_text)
+                
+                # Merge spaced letters (e.g., "G A N G A" -> "GANGA")
+                # Heuristic: If we have many spaces but short words, it's likely a boxed field
+                if len(clean_text) > 3 and clean_text.count(' ') > len(clean_text) / 3:
+                     clean_text = clean_text.replace(" ", "")
+
+                # Remove extra whitespace
+                clean_text = " ".join(clean_text.split())
+
+                if len(clean_text) > 1:
                     extracted_fields[f"Row_{idx+1}"] = {
-                        "text": text_val,
-                        "accuracy": round(avg_acc * 100, 2)
+                        "text": clean_text,
+                        "accuracy": round(sum(i[2] for i in sorted_row)/len(sorted_row)*100, 1)
                     }
 
-            return Response({
-                "text": "Full extraction complete.",
-                "data": {"fields": extracted_fields},
-                "image_url": serializer.instance.image.url
-            }, status=status.HTTP_201_CREATED)
-            
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            print(f"✅ Found {len(extracted_fields)} rows of data.")
+            print("="*40)
 
-    def preprocess_and_debug(self, path):
-        # Helper to ensure the cleaning is applied
-        return self.preprocess_for_maximum_accuracy(path)
+            return Response({
+                "status": "success",
+                "data": extracted_fields,
+                "image_url": serializer.instance.image.url,
+                "debug_image": debug_url,   # Input image AI saw
+                "detection_image": vis_url  # Output image with green boxes
+            }, status=201)
+
+        except Exception as e:
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=500)
