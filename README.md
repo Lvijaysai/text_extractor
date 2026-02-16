@@ -16,6 +16,7 @@
 ### **Backend**
 * **Framework:** Django & Django REST Framework (DRF)
 * **AI Engine:** EasyOCR (PyTorch)
+* **Computer Vision:** OpenCV (`cv2`), NumPy
 * **Database:** SQLite (Default)
 * **API:** RESTful API endpoints for file handling
 
