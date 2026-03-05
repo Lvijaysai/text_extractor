@@ -5,7 +5,7 @@
 
 ## 🚀 Key Features
 
-* **📄 AI Text Extraction:** Uses `EasyOCR` (PyTorch) to accurately read text from images.
+* **📄 AI Text Extraction:** Uses `PaddleOCR` (CPU) to accurately read text from images.
 * **🔒 Privacy First:** All processing happens locally on your machine; no data is sent to the cloud.
 * **🖥️ Modern Dashboard:** A responsive React UI for uploading files and viewing results side-by-side.
 * **⚡ Real-Time Feedback:** Instant status updates and error handling.
@@ -15,7 +15,7 @@
 
 ### **Backend**
 * **Framework:** Django & Django REST Framework (DRF)
-* **AI Engine:** EasyOCR (PyTorch)
+* **AI Engine:** PaddleOCR (CPU)
 * **Computer Vision:** OpenCV (`cv2`), NumPy
 * **Database:** SQLite (Default)
 * **API:** RESTful API endpoints for file handling
@@ -54,7 +54,7 @@ venv\Scripts\activate
 # source venv/bin/activate
 
 # Install dependencies
-pip install django djangorestframework django-cors-headers easyocr
+pip install django djangorestframework django-cors-headers paddleocr paddlepaddle
 
 # Run migrations
 python manage.py migrate
@@ -100,7 +100,8 @@ npm start
 ```text
 text_extractor/
 ├── backend/                # Django Backend
-│   ├── ocr/                # Main app for OCR logic
+│   ├── ocr/                # Main App
+|   ├── ocr_engine          # OCR logics
 │   ├── media/              # Stores uploaded images
 │   ├── db.sqlite3          # Local database
 │   └── manage.py
@@ -111,4 +112,3 @@ text_extractor/
 └── README.md
 
 ```
-
