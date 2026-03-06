@@ -1,6 +1,7 @@
-#backend/ocr_engine/align.py
+# backend/ocr_engine/align.py
 import cv2
 import numpy as np
+
 
 def order_points(pts):
     """Orders coordinates: top-left, top-right, bottom-right, bottom-left."""
@@ -13,6 +14,7 @@ def order_points(pts):
     rect[3] = pts[np.argmax(diff)]
     return rect
 
+
 def fix_perspective_and_skew(image):
     """Finds physical paper bounds and flattens warped camera photos."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -21,7 +23,7 @@ def fix_perspective_and_skew(image):
 
     cnts, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     cnts = sorted(cnts, key=cv2.contourArea, reverse=True)[:5]
-    
+
     doc_cnt = None
     for c in cnts:
         peri = cv2.arcLength(c, True)
@@ -43,12 +45,12 @@ def fix_perspective_and_skew(image):
         heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
         maxHeight = max(int(heightA), int(heightB))
 
-        dst = np.array([
-            [0, 0], [maxWidth - 1, 0], 
-            [maxWidth - 1, maxHeight - 1], [0, maxHeight - 1]
-        ], dtype="float32")
+        dst = np.array(
+            [[0, 0], [maxWidth - 1, 0], [maxWidth - 1, maxHeight - 1], [0, maxHeight - 1]],
+            dtype="float32",
+        )
 
         M = cv2.getPerspectiveTransform(rect, dst)
         return cv2.warpPerspective(image, M, (maxWidth, maxHeight))
-    
+
     return image

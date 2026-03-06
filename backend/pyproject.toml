@@ -1,0 +1,23 @@
+# backend/pyproject.toml
+
+[tool.ruff]
+# Set the maximum line length to 100 
+line-length = 100
+
+# Ignore folders that shouldn't be linted
+exclude = [
+    ".git",
+    "venv",
+    "__pycache__",
+    "migrations",
+]
+
+[tool.ruff.lint]
+# Enable standard Pyflakes (E) and pycodestyle (F) rules
+# 'I' enables isort (Automatic Import sorting)
+select = ["E", "F", "I"] 
+
+[tool.ruff.format]
+# Standard Python conventions
+quote-style = "double"
+indent-style = "space"

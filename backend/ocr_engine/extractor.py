@@ -1,13 +1,13 @@
-#backend/ocr_engine/extractor.py
-from .preprocess import resize_to_fixed, enhance_contrast
-from .roi import ROIS, crop_roi
+# backend/ocr_engine/extractor.py
 from .ocr_runner import run_ocr_on_region
-from .postprocess import validate_and_clean, parse_address
-from .align import fix_perspective_and_skew
+from .postprocess import parse_address, validate_and_clean
+from .preprocess import enhance_contrast, resize_to_fixed
+from .roi import ROIS, crop_roi
+
 
 class VisionOCRExtractor:
     """The central orchestrator for the document extraction pipeline."""
-    
+
     def process_image(self, original_img):
         # Step 2 & 3: Bypass warp for clean digital scans (uncomment if using camera photos)
         # flat_img = fix_perspective_and_skew(original_img)
@@ -15,10 +15,13 @@ class VisionOCRExtractor:
 
         # Step 4: Standardization
         aligned_img = resize_to_fixed(flat_img)
-        
+
         profile = {
-            "name": "", "date_of_birth": "", "father_name": "", "gender": "Male",
-            "address": {}
+            "name": "",
+            "date_of_birth": "",
+            "father_name": "",
+            "gender": "Male",
+            "address": {},
         }
         crops_data = {}
 
@@ -31,7 +34,7 @@ class VisionOCRExtractor:
                 crop_img = enhance_contrast(crop_img)
 
             crops_data[field] = crop_img
-            
+
             # Step 7: OCR
             raw_text = run_ocr_on_region(crop_img)
 
@@ -46,7 +49,9 @@ class VisionOCRExtractor:
                 clean_addr = validate_and_clean(raw_text, "address")
                 profile["address"] = parse_address(clean_addr)
             elif field == "gender":
-                if "FEMALE" in raw_text.upper(): profile["gender"] = "Female"
-                elif "TRANSGENDER" in raw_text.upper(): profile["gender"] = "Transgender"
+                if "FEMALE" in raw_text.upper():
+                    profile["gender"] = "Female"
+                elif "TRANSGENDER" in raw_text.upper():
+                    profile["gender"] = "Transgender"
 
         return profile, crops_data, aligned_img
