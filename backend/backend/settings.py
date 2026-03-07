@@ -35,7 +35,7 @@ SECRET_KEY = os.getenv(
 )  # Now it reads from the file!
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG") == "True"
+DEBUG = True
 
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 

@@ -9,12 +9,47 @@ from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from ocr_engine.cheque_validator import ChequeValidator
 # Import the orchestrator from your newly built module
 from ocr_engine.extractor import VisionOCRExtractor
 
 logger = logging.getLogger(__name__)
 
+class ChequeValidationView(APIView):
+    def post(self, request, *args, **kwargs):
+        files = {
+            "cheque": request.FILES.get("cheque"),
+            "pan": request.FILES.get("pan"),
+            "aadhaar": request.FILES.get("aadhaar")
+        }
+
+        if not all(files.values()):
+            return Response({"error": "Missing required documents."}, status=400)
+
+        # Convert in-memory uploads directly to OpenCV image arrays (100% safe, no disk writing)
+        cv2_images = {}
+        for key, file_obj in files.items():
+            img_bytes = file_obj.read()
+            nparr = np.frombuffer(img_bytes, np.uint8)
+            cv_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if cv_img is None:
+                return Response({"error": f"Invalid image format for {key}."}, status=400)
+            cv2_images[key] = cv_img
+
+        # Run the validation pipeline
+        results = ChequeValidator.validate(
+            cv2_images["cheque"], 
+            cv2_images["pan"], 
+            cv2_images["aadhaar"]
+        )
+
+        return Response({
+            "status": "success",
+            "validation_results": {k: v for k, v in results.items() if k != "final_decision"},
+            "final_decision": results["final_decision"]
+        }, status=200)
+
+# Make sure to keep your existing OCRView below this!
 # Initialize Extractor Globally
 extractor = VisionOCRExtractor()
 

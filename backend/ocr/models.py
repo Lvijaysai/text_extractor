@@ -2,11 +2,13 @@
 from django.db import models
 
 
-# Create your models here.
-class ScannedDocument(models.Model):
-    image = models.ImageField(upload_to="documents/")
-    extracted_text = models.TextField(blank=True, null=True)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+class BankAccount(models.Model):
+    account_number = models.CharField(max_length=20, unique=True, db_index=True)
+    account_holder_name = models.CharField(max_length=100) # Person A (Cheque Owner)
+    
+    # For a real system, you'd store an image path to compare signatures.
+    # For now, we will store a reference path if you implement OpenCV SSIM later.
+    signature_reference_path = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
-        return f"Document {self.id} uploaded at {self.uploaded_at}"
+        return f"{self.account_number} - {self.account_holder_name}"

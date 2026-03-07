@@ -198,9 +198,64 @@ body {
   background-color: #fff3cd;
   color: #856404;
 }
+.badge.danger {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Make file inputs look like clickable boxes */
+.file-drop-zone {
+  border: 2px dashed #cbd5e1;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+  background-color: #f8fafc;
+  cursor: pointer;
+  margin-bottom: 15px;
+  transition: all 0.2s;
+}
+.file-drop-zone:hover {
+  border-color: #94a3b8;
+  background-color: #f1f5f9;
+}
+.preview-img {
+  max-height: 100px;
+  margin-top: 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
 .empty-state {
   text-align: center;
   padding: 40px;
   color: #b2bec3;
+}
+
+.tab-navigation {
+  display: flex;
+  justify-content: center;
+  background-color: white;
+  border-bottom: 2px solid #e2e8f0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.tab-btn {
+  padding: 15px 30px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #64748b;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: #0f172a;
+}
+
+.tab-btn.active {
+  color: #00b894;
+  border-bottom-color: #00b894;
 }

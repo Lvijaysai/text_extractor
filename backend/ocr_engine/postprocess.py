@@ -26,8 +26,8 @@ def validate_and_clean(text, field_type):
         clean = " ".join([w for w in clean.split() if len(w) > 2])
 
     elif field_type == "dob":
-        clean = clean.replace("O", "0").replace("I", "1").replace("S", "5").replace("L", "1")
-        clean = clean.replace("Y", "7").replace("/", "").replace("4", "9")
+        # Only do safe number replacements (O to 0, S to 5, etc)
+        clean = clean.replace("O", "0").replace("I", "1").replace("S", "5").replace("L", "1").replace("Z", "2")
         digits = re.sub(r"[^0-9]", "", clean)
 
         # BULLETPROOF DATE ALGORITHM:

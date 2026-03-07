@@ -21,5 +21,5 @@ def run_ocr_on_region(image_crop):
     if not raw or not raw[0]:
         return ""
 
-    texts = [line[1][0].upper().strip() for line in raw[0] if line[1][1] > 0.40]
+    texts = [line[1][0].upper().strip() for line in raw[0] if line[1][1] > 0.10]
     return " ".join(texts)
