@@ -17,6 +17,7 @@
 * **Framework:** Django & Django REST Framework (DRF)
 * **AI Engine:** PaddleOCR (CPU)
 * **Computer Vision:** OpenCV (`cv2`), NumPy
+* **Matching Engine:** RapidFuzz
 * **Database:** SQLite (Default)
 * **API:** RESTful API endpoints for file handling
 
@@ -54,10 +55,13 @@ venv\Scripts\activate
 # source venv/bin/activate
 
 # Install dependencies
-pip install django djangorestframework django-cors-headers paddleocr paddlepaddle
+pip install django djangorestframework django-cors-headers paddleocr paddlepaddle opencv-python rapidfuzz python-dotenv
 
 # Run migrations
 python manage.py migrate
+
+# Create a superuser to add mock Bank Account data
+python manage.py createsuperuser
 
 # Start the server
 python manage.py runserver
@@ -87,26 +91,50 @@ npm start
 
 ## 📸 How to Use
 
+#### Setting up Test Data
+
+Before testing the Cheque Validator, log into the Django Admin (`http://127.0.0.1:8000/admin/`) and create a mock `BankAccount` entry with an Account Number and the Account Holder's Name.
+
+#### Using the Dashboard
+
 1. Open your browser to `http://localhost:3000`.
-2. Click **"Choose Document"** and select an image (JPG, PNG) containing text.
-3. Click **"Extract Text"**.
-4. Wait for the AI to process (1-5 seconds depending on your hardware).
-5. View the original image and the extracted text side-by-side!
+2. **Tab 1: Cheque Validation**
+* Upload a Cheque, a PAN Card (Person A), and an Aadhaar Card (Person B).
+* Click **Validate Cheque** to run the 4-step security check against your database.
+* View the instant Approved/Rejected decision.
+
+
+3. **Tab 2: PAN Form Extraction**
+* Upload a handwritten PAN application form.
+* Click **Extract Data** to digitize the profile (Name, DOB, Father's Name, Address).
+* View the original image alongside the structured JSON data.
+
+
 
 ---
 
-## 📂 Project Structure
+### 📂 Project Structure
 
 ```text
 text_extractor/
 ├── backend/                # Django Backend
-│   ├── ocr/                # Main App
-|   ├── ocr_engine          # OCR logics
-│   ├── media/              # Stores uploaded images
+│   ├── ocr/                # API App & SQLite Models
+│   ├── ocr_engine/         # Core AI & Vision Logic
+│   │   ├── align.py        # Perspective warping
+│   │   ├── cheque_validator.py # Business logic & Fuzzy matching
+│   │   ├── extractor.py    # Form extraction orchestrator
+│   │   ├── ocr_runner.py   # PaddleOCR singleton
+│   │   ├── postprocess.py  # Regex cleaning & Date fixing
+│   │   └── preprocess.py   # OpenCV Grid-melting & Contrast
+│   ├── media/              # Debug image storage (Forms only)
 │   ├── db.sqlite3          # Local database
 │   └── manage.py
 ├── frontend/               # React Frontend
-│   ├── src/                # React components (App.js)
+│   ├── src/                
+│   │   ├── App.js          # Tabbed Navigation Router
+│   │   ├── ChequeValidator.js # Validation UI Component
+│   │   ├── DocumentScanner.js # Form Scanner UI Component
+│   │   └── App.css         # Premium UI Styling
 │   ├── public/
 │   └── package.json
 └── README.md
