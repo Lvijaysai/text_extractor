@@ -2,8 +2,8 @@
 import cv2
 import numpy as np
 
-FORM_W = 1200
-FORM_H = 1700
+FORM_W = 1600
+FORM_H = 2200
 
 def resize_to_fixed(image):
     """Forces the document into a standard grid size."""
