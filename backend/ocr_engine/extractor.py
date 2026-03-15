@@ -21,37 +21,44 @@ class VisionOCRExtractor:
             "date_of_birth": "",
             "father_name": "",
             "gender": "Male",
+            "pin": "",
+            "state": "",
             "address": {},
         }
         crops_data = {}
-
+        raw_texts = {}
         for field in ROIS.keys():
             # Step 6: Crop
             crop_img = crop_roi(aligned_img, field)
 
             # Step 5: Denoise Grids
-            if field in ["name", "father_name", "dob", "address"]:
+            if field in ["name", "father_name", "dob", "address", "state", "pin"]:
                 crop_img = enhance_contrast(crop_img)
 
             crops_data[field] = crop_img
 
             # Step 7: OCR
             raw_text = run_ocr_on_region(crop_img)
+            raw_texts[field] = raw_text
 
-            # Step 8: Post-Processing Validate
-            if field == "dob":
-                profile["date_of_birth"] = validate_and_clean(raw_text, field)
-            elif field == "name":
-                profile["name"] = validate_and_clean(raw_text, "name")
-            elif field == "father_name":
-                profile["father_name"] = validate_and_clean(raw_text, "father_name")
-            elif field == "address":
-                clean_addr = validate_and_clean(raw_text, "address")
-                profile["address"] = parse_address(clean_addr)
-            elif field == "gender":
-                if "FEMALE" in raw_text.upper():
-                    profile["gender"] = "Female"
-                elif "TRANSGENDER" in raw_text.upper():
-                    profile["gender"] = "Transgender"
+        state_val = validate_and_clean(raw_texts["state"], "state")
+        pin_val = validate_and_clean(raw_texts["pin"], "pin")
+        
+        profile["state"] = state_val
+        profile["pin"] = pin_val
+
+        # Then, process all other fields
+        profile["name"] = validate_and_clean(raw_texts["name"], "name")
+        profile["date_of_birth"] = validate_and_clean(raw_texts["dob"], "dob")
+        profile["father_name"] = validate_and_clean(raw_texts["father_name"], "father_name")
+        
+        gender_raw = raw_texts.get("gender", "").upper()
+        if "FEMALE" in gender_raw:
+            profile["gender"] = "Female"
+        elif "TRANSGENDER" in raw_text.upper():
+            profile["gender"] = "Transgender"
+
+        clean_addr_string = validate_and_clean(raw_texts["address"], "address")
+        profile["address"] = parse_address(clean_addr_string, pin_val, state_val)    
 
         return profile, crops_data, aligned_img

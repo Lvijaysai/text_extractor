@@ -47,10 +47,22 @@ def validate_and_clean(text, field_type):
             return f"{d[:2]}/{d[2:4]}/{d[4:8]}"
         return ""
 
+    elif field_type == "state":
+        clean = re.sub(r"[^A-Z\-\s]", "", clean) # keep letters, hyphens, spaces
+        clean = " ".join([w for w in clean.split() if len(w) > 2])
+
+    elif field_type == "pin":
+        clean = clean.replace("O", "0").replace("I", "1").replace("S", "5").replace("L", "1").replace("Z", "2")
+        digits = re.sub(r"[^0-9]", "", clean)
+        # only keep last 6 digits to be a valid PIN
+        if len(digits) >= 6:
+            return digits[-6:]
+        return ""
+    
     return re.sub(r"\s+", " ", clean).strip()
 
 
-def parse_address(raw_address):
+def parse_address(raw_address, extracted_pin=None, extracted_state=None):
     """Splits a large address string into logical dictionary keys."""
 
     clean_address = validate_and_clean(raw_address, "address")
@@ -66,8 +78,8 @@ def parse_address(raw_address):
         "full_address": clean_address,
         "area": "",
         "city": "",
-        "state": "",
-        "pin_code": "",
+        "state": extracted_state or "",
+        "pin_code": extracted_pin or "",
         "country": "INDIA",
     }
 

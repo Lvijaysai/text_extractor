@@ -90,12 +90,22 @@ function DocumentScanner() {
                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Father's Name</p>
                   <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>{profile.father_name || "N/A"}</p>
                 </div>
+                {/* --- NEW STATE FIELD --- */}
+                <div>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>State / UT</p>
+                  <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#00b894' }}>{profile.state || "N/A"}</p>
+                </div>
+
+                {/* --- NEW PIN FIELD --- */}
+                <div>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Pincode</p>
+                  <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#00b894' }}>{profile.pin || "N/A"}</p>
+                </div>
               </div>
               
               <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
                 <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Full Address</p>
                 <p style={{ margin: 0, fontSize: '15px' }}>{profile.address?.full_address || "N/A"}</p>
-                <p style={{ margin: '8px 0 0 0', fontSize: '14px', fontWeight: 'bold' }}>PIN: {profile.address?.pin_code || "N/A"}</p>
               </div>
             </div>
           ) : (
