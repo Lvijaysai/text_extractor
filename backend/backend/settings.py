@@ -138,3 +138,29 @@ CORS_ALLOW_ALL_ORIGINS = True  # For development only
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# --- LOGGING CONFIGURATION ---
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '\n[{levelname}] {asctime} | {name} | {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        # This explicitly targets your ocr_engine folder
+        'ocr_engine': {
+            'handlers': ['console'],
+            'level': 'INFO',  # This tells it to show our logger.info() messages
+            'propagate': True,
+        },
+    },
+}
