@@ -2,7 +2,7 @@
 import logging
 import os
 import uuid
-
+from django.utils import timezone
 import cv2
 import numpy as np
 from django.conf import settings
@@ -43,12 +43,24 @@ class ChequeValidationView(APIView):
             cv2_images["aadhaar"]
         )
 
+        # Explicitly structured JSON format
         return Response({
             "status": "success",
-            "validation_results": {k: v for k, v in results.items() if k != "final_decision"},
-            "final_decision": results["final_decision"]
+            "timestamp": timezone.now().isoformat(), # Example ISO timestamp
+            "data": {
+                "validation_details": {
+                    "account_exists": results["account_valid"],
+                    "pan_owner_match": results["pan_valid"],
+                    "payee_aadhaar_match": results["payee_valid"],
+                    "signature_verified": results["signature_valid"]
+                },
+                "final_decision": results["final_decision"],
+                "engine_metadata": {
+                    "ocr_engine": "PaddleOCR v4",
+                    "matching_algorithm": "Levenshtein Fuzzy"
+                }
+            }
         }, status=200)
-
 # Make sure to keep your existing OCRView below this!
 # Initialize Extractor Globally
 extractor = VisionOCRExtractor()

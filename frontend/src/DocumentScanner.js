@@ -68,52 +68,36 @@ function DocumentScanner() {
           </div>
         </div>
 
-        {/* RIGHT SIDE: EXTRACTED DATA */}
+       {/* RIGHT SIDE: EXTRACTED DATA */}
         <div className="card">
-          <h3>Extracted Profile Data</h3>
+          <h3>Extracted Profile Data (JSON)</h3>
           {profile ? (
-            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '24px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Full Name</p>
-                  <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>{profile.name || "N/A"}</p>
-                </div>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Date of Birth</p>
-                  <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>{profile.date_of_birth || "N/A"}</p>
-                </div>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Gender</p>
-                  <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>{profile.gender || "N/A"}</p>
-                </div>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Father's Name</p>
-                  <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold' }}>{profile.father_name || "N/A"}</p>
-                </div>
-                {/* --- NEW STATE FIELD --- */}
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>State / UT</p>
-                  <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#00b894' }}>{profile.state || "N/A"}</p>
-                </div>
-
-                {/* --- NEW PIN FIELD --- */}
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Pincode</p>
-                  <p style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#00b894' }}>{profile.pin || "N/A"}</p>
-                </div>
-              </div>
-              
-              <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#64748b', textTransform: 'uppercase' }}>Full Address</p>
-                <p style={{ margin: 0, fontSize: '15px' }}>{profile.address?.full_address || "N/A"}</p>
-              </div>
+            <div style={{ 
+              backgroundColor: '#1e293b', /* Dark background for code */
+              border: '1px solid #e2e8f0', 
+              borderRadius: '8px', 
+              padding: '24px',
+              overflowX: 'auto' /* Adds scrollbar if JSON is wide */
+            }}>
+              <pre style={{ 
+                margin: 0, 
+                color: '#10b981', /* Matrix green text */
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                whiteSpace: 'pre-wrap' 
+              }}>
+                {JSON.stringify({
+                  status: "success",
+                  data: profile
+                }, null, 2)}
+              </pre>
             </div>
           ) : (
             <div className="empty-state">
-              <p>Upload a form and extract data to see the digitized profile here.</p>
+              <p>Upload a form and extract data to see the JSON payload here.</p>
             </div>
           )}
-        </div>
+        </div> 
       </div>
     </div>
   );

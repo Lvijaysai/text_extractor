@@ -21,14 +21,23 @@ reader = PaddleOCR(
 )
 logger.info("High-Precision Engine Ready")
 
-def run_ocr_on_region(image_crop):
-    """Pads the crop and executes AI character extraction."""
-    padded = cv2.copyMakeBorder(
-        image_crop, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=[255, 255, 255]
-    )
-    raw = reader.ocr(padded, cls=False)
+def run_ocr_on_region(img):
+    """Runs PaddleOCR and returns BOTH the text and the average confidence score."""
+    raw = reader.ocr(img, cls=False)
+    
+    # If nothing is detected, return empty string and 0% confidence
     if not raw or not raw[0]:
-        return ""
+        return "", 0.0
 
-    texts = [line[1][0].upper().strip() for line in raw[0] if line[1][1] > 0.10]
-    return " ".join(texts)
+    texts = []
+    confidences = []
+    
+    for line in raw[0]:
+        # line[1][0] is the text, line[1][1] is the confidence float
+        texts.append(line[1][0].upper())
+        confidences.append(line[1][1])
+        
+    # Calculate the average confidence for the entire cropped region
+    avg_conf = sum(confidences) / len(confidences) if confidences else 0.0
+    
+    return " ".join(texts), round(avg_conf, 4)

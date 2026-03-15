@@ -12,7 +12,6 @@ function ChequeValidator() {
     const file = e.target.files[0];
     if (file) {
       setFiles({ ...files, [type]: file });
-      // Create a local URL to preview the image instantly
       setPreviews({ ...previews, [type]: URL.createObjectURL(file) });
     }
   };
@@ -39,11 +38,12 @@ function ChequeValidator() {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
+      const data = await response.json();
+      
+      if (!response.ok || data.status !== "success") {
+        throw new Error(data.error || `Server error: ${response.status}`);
       }
 
-      const data = await response.json();
       setResults(data);
     } catch (err) {
       setError(err.message || "An error occurred during validation.");
@@ -52,17 +52,10 @@ function ChequeValidator() {
     }
   };
 
-  // Helper function to render a pass/fail badge
-  const renderBadge = (isPassed) => (
-    <span className={`badge ${isPassed ? 'good' : 'danger'}`}>
-      {isPassed ? '✅ Passed' : '❌ Failed'}
-    </span>
-  );
-
   return (
     <div className="main-layout">
       {error && (
-        <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
+        <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '12px', borderRadius: '6px', textAlign: 'center', marginBottom: '20px' }}>
           <strong>Error:</strong> {error}
         </div>
       )}
@@ -73,7 +66,6 @@ function ChequeValidator() {
           <h3>Document Upload</h3>
           <form onSubmit={handleSubmit}>
             
-            {/* Cheque Upload */}
             <div className="file-drop-zone" onClick={() => document.getElementById('chq-upload').click()}>
               <input type="file" id="chq-upload" hidden accept="image/*" onChange={(e) => handleFileChange(e, 'cheque')} />
               <strong>1. Upload Cheque</strong>
@@ -81,7 +73,6 @@ function ChequeValidator() {
               {previews.cheque && <img src={previews.cheque} alt="Cheque Preview" className="preview-img" />}
             </div>
 
-            {/* PAN Upload */}
             <div className="file-drop-zone" onClick={() => document.getElementById('pan-upload').click()}>
               <input type="file" id="pan-upload" hidden accept="image/*" onChange={(e) => handleFileChange(e, 'pan')} />
               <strong>2. Upload PAN Card (Person A)</strong>
@@ -89,7 +80,6 @@ function ChequeValidator() {
               {previews.pan && <img src={previews.pan} alt="PAN Preview" className="preview-img" />}
             </div>
 
-            {/* Aadhaar Upload */}
             <div className="file-drop-zone" onClick={() => document.getElementById('aad-upload').click()}>
               <input type="file" id="aad-upload" hidden accept="image/*" onChange={(e) => handleFileChange(e, 'aadhaar')} />
               <strong>3. Upload Aadhaar Card (Person B)</strong>
@@ -102,10 +92,9 @@ function ChequeValidator() {
             </button>
           </form>
         </div>
-
         {/* RIGHT SIDE: RESULTS */}
         <div className="card">
-          <h3>System Decision Engine</h3>
+          <h3>System Decision Engine (JSON)</h3>
           
           {!results && !loading && (
             <div className="empty-state">
@@ -119,49 +108,24 @@ function ChequeValidator() {
             </div>
           )}
 
-          {results && (
-            <div>
-              <table className="data-table" style={{ marginBottom: '20px' }}>
-                <thead>
-                  <tr>
-                    <th>Business Rule</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="row-id">Account Exists in Database</td>
-                    <td>{renderBadge(results.validation_results.account_valid)}</td>
-                  </tr>
-                  <tr>
-                    <td className="row-id">PAN Matches Cheque Owner</td>
-                    <td>{renderBadge(results.validation_results.pan_valid)}</td>
-                  </tr>
-                  <tr>
-                    <td className="row-id">Aadhaar Matches Payee</td>
-                    <td>{renderBadge(results.validation_results.payee_valid)}</td>
-                  </tr>
-                  <tr>
-                    <td className="row-id">Signature Verification</td>
-                    <td>{renderBadge(results.validation_results.signature_valid)}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div style={{ 
-                padding: '20px', 
-                borderRadius: '8px', 
-                textAlign: 'center',
-                backgroundColor: results.final_decision === 'Approved' ? '#d4edda' : '#f8d7da',
-                border: `2px solid ${results.final_decision === 'Approved' ? '#28a745' : '#dc3545'}`
+          {results && results.data && (
+            <div style={{ 
+              backgroundColor: '#1e293b', /* Dark background for code */
+              border: '1px solid #e2e8f0', 
+              borderRadius: '8px', 
+              padding: '24px',
+              overflowX: 'auto',
+              marginTop: '15px'
+            }}>
+              <pre style={{ 
+                margin: 0, 
+                color: '#10b981', /* Matrix green text */
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                whiteSpace: 'pre-wrap' 
               }}>
-                <h2 style={{ 
-                  margin: 0, 
-                  color: results.final_decision === 'Approved' ? '#155724' : '#721c24' 
-                }}>
-                  {results.final_decision === 'Approved' ? '✅ WITHDRAWAL APPROVED' : '⛔ CHEQUE REJECTED'}
-                </h2>
-              </div>
+                {JSON.stringify(results, null, 2)}
+              </pre>
             </div>
           )}
         </div>
