@@ -39,8 +39,9 @@ class VisionOCRExtractor:
             crops_data[field] = crop_img
 
             # Step 7: OCR
-            raw_text, confidence_score = run_ocr_on_region(crop_img)
-            raw_texts[field] = raw_text
+            detect_text = field != "pin"
+            raw_text, confidence_score = run_ocr_on_region(crop_img, detect_text=detect_text)
+            raw_texts[field] = raw_text.strip()
             confidences[field] = confidence_score
 
         state_val = validate_and_clean(raw_texts.get("state", ""), "state")
@@ -93,7 +94,8 @@ class VisionOCRExtractor:
                 "city": profile["address"]["city"],
                 "district": profile["address"]["area"]
             },
-            "confidence_metrics": review_flags
+            "confidence_metrics": review_flags,
+            "raw_extracted_text": raw_texts,
         }    
     
         return formatted_profile, crops_data, aligned_img

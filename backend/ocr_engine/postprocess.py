@@ -10,6 +10,73 @@ def _collapse_spaced_letters(text):
     return clean
 
 
+def _pin_token_to_digits(token, include_weak_ones=False):
+    strong_map = {
+        "O": "0",
+        "Q": "0",
+        "D": "0",
+        "S": "5",
+        "Z": "2",
+        "B": "8",
+        "G": "6",
+    }
+    weak_one_map = {
+        "I": "1",
+        "L": "1",
+        "T": "1",
+        "J": "1",
+        "|": "1",
+        "!": "1",
+    }
+
+    mapped_digits = []
+    char_map = dict(strong_map)
+    if include_weak_ones:
+        char_map.update(weak_one_map)
+
+    for char in token:
+        if char.isdigit():
+            mapped_digits.append(char)
+        elif char in char_map:
+            mapped_digits.append(char_map[char])
+
+    return "".join(mapped_digits)
+
+
+def _extract_pin_digits(text):
+    compact = re.sub(r"[^A-Z0-9|!]", "", text.upper())
+    separator_chars = {"I", "L", "|", "!"}
+
+    if len(compact) >= 10:
+        even_lane = compact[::2]
+        odd_lane = compact[1::2]
+        even_ratio = sum(char in separator_chars for char in even_lane) / len(even_lane)
+        odd_ratio = sum(char in separator_chars for char in odd_lane) / len(odd_lane)
+
+        if even_ratio >= 0.6 and len(odd_lane) >= 6:
+            digits = _pin_token_to_digits(odd_lane, include_weak_ones=True)
+            if len(digits) >= 6:
+                return digits[:6]
+
+        if odd_ratio >= 0.6 and len(even_lane) >= 6:
+            digits = _pin_token_to_digits(even_lane, include_weak_ones=True)
+            if len(digits) >= 6:
+                return digits[:6]
+
+    for token in re.findall(r"[A-Z0-9|!]+", text.upper()):
+        digits = _pin_token_to_digits(token, include_weak_ones=False)
+        if len(digits) == 6:
+            return digits
+        if len(digits) > 6 and token.isdigit():
+            return digits[:6]
+
+    joined_numeric = "".join(char for char in text if char.isdigit())
+    if len(joined_numeric) >= 6:
+        return joined_numeric[:6]
+
+    return ""
+
+
 def validate_and_clean(text, field_type):
     """Removes OCR artifacts and formats dates/names."""
     clean = text.upper()
@@ -27,7 +94,7 @@ def validate_and_clean(text, field_type):
 
     elif field_type == "dob":
         # Only do safe number replacements (O to 0, S to 5, etc)
-        clean = clean.replace("O", "0").replace("I", "1").replace("S", "5").replace("L", "1").replace("Z", "2")
+        clean = clean.replace("O", "0").replace("I", "1").replace("S", "5").replace("L", "1").replace("Z", "2").replace("B", "8").replace("Q", "9").replace("Y", "7")   
         digits = re.sub(r"[^0-9]", "", clean)
 
         # BULLETPROOF DATE ALGORITHM:
@@ -41,9 +108,9 @@ def validate_and_clean(text, field_type):
                 day_month = digits[idx - 4 : idx]
                 return f"{day_month[:2]}/{day_month[2:4]}/{year}"
 
-        # Fallback
-        if len(digits) >= 8:
-            d = digits[-8:]
+        # Conservative fallback: only accept an exact 8-digit date string.
+        if len(digits) == 8:
+            d = digits
             return f"{d[:2]}/{d[2:4]}/{d[4:8]}"
         return ""
 
@@ -52,12 +119,7 @@ def validate_and_clean(text, field_type):
         clean = " ".join([w for w in clean.split() if len(w) > 2])
 
     elif field_type == "pin":
-        clean = clean.replace("O", "0").replace("I", "1").replace("S", "5").replace("L", "1").replace("Z", "2")
-        digits = re.sub(r"[^0-9]", "", clean)
-        # only keep last 6 digits to be a valid PIN
-        if len(digits) >= 6:
-            return digits[-6:]
-        return ""
+        return _extract_pin_digits(clean)
     
     return re.sub(r"\s+", " ", clean).strip()
 
