@@ -1,6 +1,7 @@
 // frontend/src/DocumentScanner.js
 import React, { useState } from 'react';
 import axios from 'axios';
+import { downloadPDF } from "./ExportPDF";
 
 function DocumentScanner() {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -50,7 +51,9 @@ function DocumentScanner() {
           <div className="file-drop-zone" onClick={() => document.getElementById('pan-form-upload').click()}>
             <input type="file" id="pan-form-upload" hidden accept="image/*" onChange={handleFileChange} />
             <strong>Select Handwritten Form</strong>
-            <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>{selectedFile ? selectedFile.name : 'Click to browse'}</p>
+            <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>
+                {selectedFile ? selectedFile.name : 'Click to browse'}
+            </p>
           </div>
           
           <button onClick={handleScan} disabled={!selectedFile || loading} className="btn btn-primary" style={{ width: '100%' }}>
@@ -68,28 +71,46 @@ function DocumentScanner() {
           </div>
         </div>
 
-       {/* RIGHT SIDE: EXTRACTED DATA */}
+        {/* RIGHT SIDE: EXTRACTED DATA */}
         <div className="card">
-          <h3>Extracted Profile Data (JSON)</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ margin: 0 }}>Extracted Profile Data</h3>
+            
+            {/* Show Download button only if profile exists */}
+            {profile && (
+              <button
+                onClick={() => downloadPDF(profile)}
+                style={{
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '12px'
+                }}
+              >
+                📄 Download PDF
+              </button>
+            )}
+          </div>
+
           {profile ? (
             <div style={{ 
-              backgroundColor: '#1e293b', /* Dark background for code */
-              border: '1px solid #e2e8f0', 
+              backgroundColor: '#1e293b', 
               borderRadius: '8px', 
               padding: '24px',
-              overflowX: 'auto' /* Adds scrollbar if JSON is wide */
+              overflowX: 'auto' 
             }}>
               <pre style={{ 
                 margin: 0, 
-                color: '#10b981', /* Matrix green text */
+                color: '#10b981', 
                 fontFamily: 'monospace',
                 fontSize: '14px',
                 whiteSpace: 'pre-wrap' 
               }}>
-                {JSON.stringify({
-                  status: "success",
-                  data: profile
-                }, null, 2)}
+                {JSON.stringify({ status: "success", data: profile }, null, 2)}
               </pre>
             </div>
           ) : (
@@ -97,7 +118,7 @@ function DocumentScanner() {
               <p>Upload a form and extract data to see the JSON payload here.</p>
             </div>
           )}
-        </div> 
+        </div>
       </div>
     </div>
   );
