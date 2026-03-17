@@ -1,5 +1,6 @@
 // frontend/src/ChequeValidator.js
 import React, { useState } from 'react';
+import { downloadChequeValidationPDF } from './ExportChequePDF';
 
 function ChequeValidator() {
   const [files, setFiles] = useState({ cheque: null, pan: null, aadhaar: null });
@@ -39,7 +40,7 @@ function ChequeValidator() {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok || data.status !== "success") {
         throw new Error(data.error || `Server error: ${response.status}`);
       }
@@ -55,7 +56,16 @@ function ChequeValidator() {
   return (
     <div className="main-layout">
       {error && (
-        <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '12px', borderRadius: '6px', textAlign: 'center', marginBottom: '20px' }}>
+        <div
+          style={{
+            backgroundColor: '#fee2e2',
+            color: '#991b1b',
+            padding: '12px',
+            borderRadius: '6px',
+            textAlign: 'center',
+            marginBottom: '20px'
+          }}
+        >
           <strong>Error:</strong> {error}
         </div>
       )}
@@ -65,37 +75,108 @@ function ChequeValidator() {
         <div className="card">
           <h3>Document Upload</h3>
           <form onSubmit={handleSubmit}>
-            
-            <div className="file-drop-zone" onClick={() => document.getElementById('chq-upload').click()}>
-              <input type="file" id="chq-upload" hidden accept="image/*" onChange={(e) => handleFileChange(e, 'cheque')} />
+            <div
+              className="file-drop-zone"
+              onClick={() => document.getElementById('chq-upload').click()}
+            >
+              <input
+                type="file"
+                id="chq-upload"
+                hidden
+                accept="image/*"
+                onChange={(e) => handleFileChange(e, 'cheque')}
+              />
               <strong>1. Upload Cheque</strong>
-              <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>{files.cheque ? files.cheque.name : 'Click to browse'}</p>
-              {previews.cheque && <img src={previews.cheque} alt="Cheque Preview" className="preview-img" />}
+              <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>
+                {files.cheque ? files.cheque.name : 'Click to browse'}
+              </p>
+              {previews.cheque && (
+                <img src={previews.cheque} alt="Cheque Preview" className="preview-img" />
+              )}
             </div>
 
-            <div className="file-drop-zone" onClick={() => document.getElementById('pan-upload').click()}>
-              <input type="file" id="pan-upload" hidden accept="image/*" onChange={(e) => handleFileChange(e, 'pan')} />
+            <div
+              className="file-drop-zone"
+              onClick={() => document.getElementById('pan-upload').click()}
+            >
+              <input
+                type="file"
+                id="pan-upload"
+                hidden
+                accept="image/*"
+                onChange={(e) => handleFileChange(e, 'pan')}
+              />
               <strong>2. Upload PAN Card (Person A)</strong>
-              <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>{files.pan ? files.pan.name : 'Click to browse'}</p>
-              {previews.pan && <img src={previews.pan} alt="PAN Preview" className="preview-img" />}
+              <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>
+                {files.pan ? files.pan.name : 'Click to browse'}
+              </p>
+              {previews.pan && (
+                <img src={previews.pan} alt="PAN Preview" className="preview-img" />
+              )}
             </div>
 
-            <div className="file-drop-zone" onClick={() => document.getElementById('aad-upload').click()}>
-              <input type="file" id="aad-upload" hidden accept="image/*" onChange={(e) => handleFileChange(e, 'aadhaar')} />
+            <div
+              className="file-drop-zone"
+              onClick={() => document.getElementById('aad-upload').click()}
+            >
+              <input
+                type="file"
+                id="aad-upload"
+                hidden
+                accept="image/*"
+                onChange={(e) => handleFileChange(e, 'aadhaar')}
+              />
               <strong>3. Upload Aadhaar Card (Person B)</strong>
-              <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>{files.aadhaar ? files.aadhaar.name : 'Click to browse'}</p>
-              {previews.aadhaar && <img src={previews.aadhaar} alt="Aadhaar Preview" className="preview-img" />}
+              <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>
+                {files.aadhaar ? files.aadhaar.name : 'Click to browse'}
+              </p>
+              {previews.aadhaar && (
+                <img src={previews.aadhaar} alt="Aadhaar Preview" className="preview-img" />
+              )}
             </div>
 
-            <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }}>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: '10px' }}
+            >
               {loading ? "⏳ Validating Documents..." : "🚀 Validate Cheque"}
             </button>
           </form>
         </div>
+
         {/* RIGHT SIDE: RESULTS */}
         <div className="card">
-          <h3>System Decision Engine (JSON)</h3>
-          
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '15px'
+            }}
+          >
+            <h3 style={{ margin: 0 }}>System Decision Engine (JSON)</h3>
+
+            {results && results.data && (
+              <button
+                onClick={() => downloadChequeValidationPDF(results)}
+                style={{
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '12px'
+                }}
+              >
+                📄 Download PDF
+              </button>
+            )}
+          </div>
+
           {!results && !loading && (
             <div className="empty-state">
               <p>Upload all three documents and run the validation to see the system analysis.</p>
@@ -109,21 +190,25 @@ function ChequeValidator() {
           )}
 
           {results && results.data && (
-            <div style={{ 
-              backgroundColor: '#1e293b', /* Dark background for code */
-              border: '1px solid #e2e8f0', 
-              borderRadius: '8px', 
-              padding: '24px',
-              overflowX: 'auto',
-              marginTop: '15px'
-            }}>
-              <pre style={{ 
-                margin: 0, 
-                color: '#10b981', /* Matrix green text */
-                fontFamily: 'monospace',
-                fontSize: '14px',
-                whiteSpace: 'pre-wrap' 
-              }}>
+            <div
+              style={{
+                backgroundColor: '#1e293b',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
+                padding: '24px',
+                overflowX: 'auto',
+                marginTop: '15px'
+              }}
+            >
+              <pre
+                style={{
+                  margin: 0,
+                  color: '#10b981',
+                  fontFamily: 'monospace',
+                  fontSize: '14px',
+                  whiteSpace: 'pre-wrap'
+                }}
+              >
                 {JSON.stringify(results, null, 2)}
               </pre>
             </div>

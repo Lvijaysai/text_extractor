@@ -1,9 +1,12 @@
+#backend/ocr_engine/extractor.py
 from collections import defaultdict
 from difflib import SequenceMatcher
 
 import cv2
 import numpy as np
 
+from .crop_refiner import refine_field_crop
+from .layout_detector import resolve_dynamic_rois
 from .ocr_runner import run_ocr_on_region, run_ocr_on_region_detailed
 from .postprocess import (
     format_dob_from_parts,
@@ -17,7 +20,7 @@ from .preprocess import (
     resize_to_fixed,
     to_clean_grayscale,
 )
-from .roi import ROIS, crop_roi
+from .roi import ROIS, absolute_roi, crop_absolute_roi, crop_roi
 
 GENDER_BOX_WINDOWS = {
     "Male": (0.10, 0.66, 0.14, 0.98),
@@ -150,6 +153,7 @@ def _select_consensus_candidate(field, candidates):
         return payload["raw_text"], best_clean, round(mean_confidence, 4)
 
     if field in {"name", "father_name"} and viable_candidates:
+
         def similarity_vote(target):
             return sum(
                 SequenceMatcher(None, target["clean_text"], candidate["clean_text"]).ratio()
@@ -262,9 +266,7 @@ def _extract_address_field(base_crop, clean_crop):
             {
                 "raw_text": raw_text.strip(),
                 "clean_text": (
-                    " ".join(line_items)
-                    if line_items
-                    else validate_and_clean(raw_text, "address")
+                    " ".join(line_items) if line_items else validate_and_clean(raw_text, "address")
                 ),
                 "confidence": confidence,
                 "line_items": line_items,
@@ -468,6 +470,7 @@ def _extract_boxed_dob(crop_img):
             ):
                 digit = "7"
                 digit_score = vote_scores["7"]
+
             digit_parts.append(digit)
             raw_parts.append(digit)
             confidences.append(digit_score)
@@ -749,12 +752,64 @@ def _refine_address_with_known_names(address_dict, known_names):
     return address_dict
 
 
+def _extract_field_payload(field, base_crop, clean_crop):
+    if field == "dob":
+        raw_text, clean_text, confidence, debug_crop = _extract_dob_field(
+            base_crop,
+            clean_crop,
+        )
+        return {
+            "raw_text": raw_text,
+            "clean_text": clean_text,
+            "confidence": confidence,
+            "debug_crop": debug_crop,
+            "address_lines": [],
+        }
+
+    if field == "gender":
+        raw_text, clean_text, confidence, debug_crop = _extract_gender_field(base_crop)
+        return {
+            "raw_text": raw_text,
+            "clean_text": clean_text,
+            "confidence": confidence,
+            "debug_crop": debug_crop,
+            "address_lines": [],
+        }
+
+    if field == "address":
+        raw_text, clean_text, confidence, address_lines, debug_crop = _extract_address_field(
+            base_crop,
+            clean_crop,
+        )
+        return {
+            "raw_text": raw_text,
+            "clean_text": clean_text,
+            "confidence": confidence,
+            "debug_crop": debug_crop,
+            "address_lines": address_lines,
+        }
+
+    raw_text, clean_text, confidence, debug_crop = _extract_text_field(
+        field,
+        base_crop,
+        clean_crop,
+    )
+    return {
+        "raw_text": raw_text,
+        "clean_text": clean_text,
+        "confidence": confidence,
+        "debug_crop": debug_crop,
+        "address_lines": [],
+    }
+
+
 class VisionOCRExtractor:
     """The central orchestrator for the document extraction pipeline."""
 
     def process_image(self, original_img):
         aligned_img = resize_to_fixed(original_img)
         clean_img = to_clean_grayscale(aligned_img)
+        dynamic_rois = resolve_dynamic_rois(aligned_img, clean_img)
 
         profile = {
             "name": "",
@@ -772,41 +827,56 @@ class VisionOCRExtractor:
         address_lines = []
 
         for field in ROIS:
-            base_crop = crop_roi(aligned_img, field)
-            clean_crop = crop_roi(clean_img, field)
+            roi = dynamic_rois.get(field, absolute_roi(aligned_img.shape, field))
+
+            if roi == absolute_roi(aligned_img.shape, field):
+                base_crop = crop_roi(aligned_img, field)
+                clean_crop = crop_roi(clean_img, field)
+            else:
+                base_crop = crop_absolute_roi(aligned_img, roi)
+                clean_crop = crop_absolute_roi(clean_img, roi)
+                if not base_crop.size or not clean_crop.size:
+                    roi = absolute_roi(aligned_img.shape, field)
+                    base_crop = crop_roi(aligned_img, field)
+                    clean_crop = crop_roi(clean_img, field)
+
+            def extractor(candidate_base, candidate_clean):
+                return _extract_field_payload(
+                    field,
+                    candidate_base,
+                    candidate_clean,
+                )
+
+            payload = extractor(base_crop, clean_crop)
+            roi, payload = refine_field_crop(
+                field,
+                roi,
+                aligned_img,
+                clean_img,
+                extractor,
+                initial_result=payload,
+            )
+
+            raw_text = payload["raw_text"]
+            clean_text = payload["clean_text"]
+            confidence = payload["confidence"]
+            debug_crop = payload["debug_crop"]
+            address_lines = payload["address_lines"] or address_lines
 
             if field == "dob":
-                raw_text, clean_text, confidence, debug_crop = _extract_dob_field(
-                    base_crop,
-                    clean_crop,
-                )
                 profile["date_of_birth"] = clean_text
             elif field == "gender":
-                raw_text, clean_text, confidence, debug_crop = _extract_gender_field(base_crop)
                 profile["gender"] = clean_text
             elif field == "address":
-                (
-                    raw_text,
-                    clean_text,
-                    confidence,
-                    address_lines,
-                    debug_crop,
-                ) = _extract_address_field(base_crop, clean_crop)
                 profile["address"] = clean_text
-            else:
-                raw_text, clean_text, confidence, debug_crop = _extract_text_field(
-                    field,
-                    base_crop,
-                    clean_crop,
-                )
-                if field == "name":
-                    profile["name"] = clean_text
-                elif field == "father_name":
-                    profile["father_name"] = clean_text
-                elif field == "state":
-                    profile["state"] = clean_text
-                elif field == "pin":
-                    profile["pin"] = clean_text
+            elif field == "name":
+                profile["name"] = clean_text
+            elif field == "father_name":
+                profile["father_name"] = clean_text
+            elif field == "state":
+                profile["state"] = clean_text
+            elif field == "pin":
+                profile["pin"] = clean_text
 
             crops_data[field] = debug_crop
             raw_texts[field] = raw_text.strip()

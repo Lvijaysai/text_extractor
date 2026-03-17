@@ -4,7 +4,9 @@ from unittest.mock import patch
 import numpy as np
 from django.test import SimpleTestCase
 
+from ocr_engine.crop_refiner import refine_field_crop
 from ocr_engine.extractor import VisionOCRExtractor, _resolve_gender_from_checkbox_scores
+from ocr_engine.layout_detector import build_dynamic_rois_from_details
 from ocr_engine.postprocess import (
     format_dob_from_parts,
     normalize_address_line,
@@ -85,6 +87,123 @@ class GenderResolverTests(SimpleTestCase):
         self.assertGreater(confidence, 0.2)
 
 
+class DynamicLayoutDetectionTests(SimpleTestCase):
+    @staticmethod
+    def _box(x1, y1, x2, y2):
+        return [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+
+    def test_dynamic_rois_are_built_from_anchor_rows(self):
+        details = [
+            {"text": "LAST NAME / SURNAME", "score": 0.95, "box": self._box(90, 628, 360, 660)},
+            {"text": "GENDER", "score": 0.96, "box": self._box(70, 1038, 220, 1070)},
+            {"text": "DATE OF BIRTH", "score": 0.96, "box": self._box(70, 1160, 340, 1192)},
+            {"text": "LAST NAME / SURNAME", "score": 0.95, "box": self._box(90, 1374, 360, 1406)},
+            {"text": "MOTHER'S NAME", "score": 0.96, "box": self._box(70, 1640, 320, 1672)},
+            {"text": "RESIDENCE ADDRESS", "score": 0.96, "box": self._box(70, 1750, 360, 1782)},
+            {
+                "text": "STATE / UNION TERRITORY",
+                "score": 0.96,
+                "box": self._box(70, 2084, 420, 2116),
+            },
+        ]
+
+        rois = build_dynamic_rois_from_details(details, (2200, 1600, 3))
+
+        self.assertEqual(
+            set(rois),
+            {"name", "dob", "gender", "father_name", "address", "state", "pin"},
+        )
+        self.assertLess(rois["name"][1], rois["gender"][1])
+        self.assertGreater(rois["dob"][1], 1172)
+        self.assertGreater(rois["father_name"][1], rois["dob"][1])
+        self.assertLessEqual(rois["address"][3], rois["state"][1])
+        self.assertGreater(rois["pin"][0], rois["state"][0])
+
+    def test_dynamic_rois_reject_noisy_bottom_labels(self):
+        details = [
+            {"text": "LAST NAME / SURNAME", "score": 0.95, "box": self._box(90, 520, 360, 552)},
+            {"text": "GENDER", "score": 0.96, "box": self._box(70, 1030, 220, 1062)},
+            {"text": "DATE OF BIRTH", "score": 0.96, "box": self._box(70, 1140, 340, 1172)},
+            {"text": "RESIDENCE ADDRESS", "score": 0.96, "box": self._box(70, 1860, 360, 1892)},
+            {
+                "text": (
+                    "RAND/STSET/LARA PART OTICE ARCALCCAIRYTEHTICNSOIRDTTON "
+                    "TOVNCIYCTORRIC SRETEURON TERRTCRY KARNATAA"
+                ),
+                "score": 0.88,
+                "box": self._box(70, 1960, 1420, 2050),
+            },
+        ]
+
+        rois = build_dynamic_rois_from_details(details, (2200, 1600, 3))
+
+        self.assertEqual(rois, {})
+
+
+class CropRefinerTests(SimpleTestCase):
+    def test_low_confidence_result_expands_crop(self):
+        aligned = np.zeros((240, 240, 3), dtype=np.uint8)
+        clean = np.zeros((240, 240, 3), dtype=np.uint8)
+        base_roi = (80, 80, 160, 120)
+
+        def extractor(base_crop, clean_crop):
+            width = base_crop.shape[1]
+            confidence = 0.55 if width <= 80 else 0.93
+            return {
+                "raw_text": "NARASEMHAPPA",
+                "clean_text": "NARASEMHAPPA",
+                "confidence": confidence,
+                "debug_crop": base_crop,
+                "address_lines": [],
+            }
+
+        best_roi, best_result = refine_field_crop(
+            "name",
+            base_roi,
+            aligned,
+            clean,
+            extractor,
+        )
+
+        self.assertGreater(best_roi[2] - best_roi[0], base_roi[2] - base_roi[0])
+        self.assertGreater(best_result["confidence"], 0.9)
+
+    def test_label_leakage_result_shrinks_crop(self):
+        aligned = np.zeros((240, 240, 3), dtype=np.uint8)
+        clean = np.zeros((240, 240, 3), dtype=np.uint8)
+        base_roi = (80, 80, 160, 120)
+
+        def extractor(base_crop, clean_crop):
+            width = base_crop.shape[1]
+            if width >= 80:
+                return {
+                    "raw_text": "LAST NAME NARASEMHAPPA",
+                    "clean_text": "NARASEMHAPPA",
+                    "confidence": 0.92,
+                    "debug_crop": base_crop,
+                    "address_lines": [],
+                }
+
+            return {
+                "raw_text": "NARASEMHAPPA",
+                "clean_text": "NARASEMHAPPA",
+                "confidence": 0.90,
+                "debug_crop": base_crop,
+                "address_lines": [],
+            }
+
+        best_roi, best_result = refine_field_crop(
+            "name",
+            base_roi,
+            aligned,
+            clean,
+            extractor,
+        )
+
+        self.assertLess(best_roi[2] - best_roi[0], base_roi[2] - base_roi[0])
+        self.assertEqual(best_result["raw_text"], "NARASEMHAPPA")
+
+
 class VisionOCRExtractorTests(SimpleTestCase):
     @patch("ocr_engine.extractor.resize_to_fixed", side_effect=lambda image: image)
     @patch("ocr_engine.extractor.to_clean_grayscale", side_effect=lambda image: image)
@@ -147,4 +266,73 @@ class VisionOCRExtractorTests(SimpleTestCase):
         self.assertEqual(profile["address_details"]["address_line_1"], "S/O GANGAPPA")
         self.assertEqual(profile["address_details"]["lines"][1], "QCNAGANAHALLI")
         self.assertIn("pin", crops_data)
+        self.assertEqual(aligned_img.shape, (10, 10, 3))
+
+    @patch("ocr_engine.extractor.resize_to_fixed", side_effect=lambda image: image)
+    @patch("ocr_engine.extractor.to_clean_grayscale", side_effect=lambda image: image)
+    @patch(
+        "ocr_engine.extractor.crop_roi",
+        side_effect=AssertionError("fixed crop should not be used when dynamic ROIs exist"),
+    )
+    @patch(
+        "ocr_engine.extractor.resolve_dynamic_rois",
+        return_value={
+            "name": (0, 0, 8, 8),
+            "dob": (0, 0, 8, 8),
+            "gender": (0, 0, 8, 8),
+            "father_name": (0, 0, 8, 8),
+            "address": (0, 0, 8, 8),
+            "state": (0, 0, 8, 8),
+            "pin": (0, 0, 8, 8),
+        },
+    )
+    @patch("ocr_engine.extractor._extract_text_field")
+    @patch("ocr_engine.extractor._extract_address_field")
+    @patch("ocr_engine.extractor._extract_gender_field")
+    @patch("ocr_engine.extractor._extract_dob_field")
+    def test_dynamic_rois_take_precedence_over_fixed_coordinates(
+        self,
+        mock_extract_dob,
+        mock_extract_gender,
+        mock_extract_address,
+        mock_extract_text,
+        _mock_dynamic_rois,
+        _mock_crop_roi,
+        _mock_to_clean_grayscale,
+        _mock_resize_to_fixed,
+    ):
+        mock_extract_text.side_effect = lambda field, base_crop, clean_crop: {
+            "name": ("NARASEMHAPPA", "NARASEMHAPPA", 0.93, base_crop),
+            "father_name": ("GANGAPPA", "GANGAPPA", 0.90, base_crop),
+            "state": ("KARNATAYA", "KARNATAKA", 0.86, base_crop),
+            "pin": ("561210", "561210", 0.92, base_crop),
+        }[field]
+        mock_extract_dob.return_value = (
+            "01 01 145Y",
+            "01/01/1957",
+            0.88,
+            np.zeros((8, 8, 3), dtype=np.uint8),
+        )
+        mock_extract_gender.return_value = (
+            "MALE FEMALE TRANSGENDER",
+            "Male",
+            0.77,
+            np.zeros((8, 8, 3), dtype=np.uint8),
+        )
+        mock_extract_address.return_value = (
+            "SO GANGAPPA QCNAGANAHALLI H CSUQ GAUDIBIDANUA CHIKKABALLAPUR",
+            "SO GANGAPPA QCNAGANAHALLI H CSUQ GAUDIBIDANUA CHIKKABALLAPUR",
+            0.88,
+            ["S/O GANGAPPA", "QCNAGANAHALLI", "HCSUQ", "GAUDIBIDANUA", "CHIKKABALLAPUR"],
+            np.zeros((8, 8, 3), dtype=np.uint8),
+        )
+
+        profile, crops_data, aligned_img = VisionOCRExtractor().process_image(
+            np.zeros((10, 10, 3), dtype=np.uint8)
+        )
+
+        self.assertEqual(profile["dob"], "01/01/1957")
+        self.assertEqual(profile["gender"], "Male")
+        self.assertEqual(profile["location"]["state"], "KARNATAKA")
+        self.assertEqual(crops_data["name"].shape, (8, 8, 3))
         self.assertEqual(aligned_img.shape, (10, 10, 3))
