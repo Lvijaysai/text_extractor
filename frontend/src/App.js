@@ -1,7 +1,7 @@
 // frontend/src/App.js
 import React, { useState } from 'react';
 import ChequeValidator from './ChequeValidator';
-import DocumentScanner from './DocumentScanner';
+import PanFormScanner from './PanFormScanner';
 import './App.css'; 
 
 function App() {
@@ -31,7 +31,7 @@ function App() {
 
       <main style={{ padding: '20px', backgroundColor: '#f8fafc', minHeight: '85vh' }}>
         {/* Render the correct tool based on the clicked tab */}
-        {activeTab === 'cheque' ? <ChequeValidator /> : <DocumentScanner />}
+        {activeTab === 'cheque' ? <ChequeValidator /> : <PanFormScanner />}
       </main>
     </div>
   );

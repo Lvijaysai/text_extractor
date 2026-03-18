@@ -14,7 +14,12 @@ export const downloadPDF = (data) => {
     ["Pincode", data.location?.pincode || "N/A"],
   ];
 
-  const fullAddress = data.address_details?.full_address?.trim();
+  const fullAddress = (
+    data.address_details?.full_address ||
+    data.address_details?.raw_text ||
+    data.address_details?.lines?.join(', ') ||
+    ''
+  ).trim();
 
   if (fullAddress) {
     rows.push(["Full Address", fullAddress]);

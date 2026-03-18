@@ -1,17 +1,24 @@
 # backend/ocr/views.py
+import json
 import logging
 import os
 import uuid
-from django.utils import timezone
+
 import cv2
 import numpy as np
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
+from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
 from ocr_engine.cheque_validator import ChequeValidator
-# Import the orchestrator from your newly built module
 from ocr_engine.extractor import VisionOCRExtractor
+from ocr_engine.output_fields import (
+    ALLOWED_OUTPUT_FIELDS,
+    DEFAULT_OUTPUT_FIELDS,
+    has_selected_primary_fields,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,11 +87,64 @@ class OCRView(APIView):
             return "Unsupported image format."
         return None
 
+    def _parse_requested_fields(self, request):
+        raw_fields = request.data.get("fields")
+        if raw_fields in (None, ""):
+            return list(DEFAULT_OUTPUT_FIELDS), None
+
+        parsed_fields = raw_fields
+        if isinstance(raw_fields, str):
+            raw_fields = raw_fields.strip()
+            if not raw_fields:
+                return list(DEFAULT_OUTPUT_FIELDS), None
+
+            try:
+                parsed_fields = json.loads(raw_fields)
+            except json.JSONDecodeError:
+                parsed_fields = [item.strip() for item in raw_fields.split(",") if item.strip()]
+
+        if isinstance(parsed_fields, str):
+            parsed_fields = [parsed_fields]
+
+        if not isinstance(parsed_fields, (list, tuple, set)):
+            return None, "Invalid fields payload."
+
+        normalized_fields = []
+        invalid_fields = []
+
+        for field in parsed_fields:
+            if not isinstance(field, str):
+                invalid_fields.append(str(field))
+                continue
+
+            clean_field = field.strip()
+            if not clean_field:
+                continue
+
+            if clean_field not in ALLOWED_OUTPUT_FIELDS:
+                invalid_fields.append(clean_field)
+                continue
+
+            if clean_field not in normalized_fields:
+                normalized_fields.append(clean_field)
+
+        if invalid_fields:
+            return None, f"Unsupported fields: {', '.join(invalid_fields)}"
+
+        if not has_selected_primary_fields(normalized_fields):
+            return None, "Select at least one extraction field."
+
+        return normalized_fields, None
+
     def post(self, request, *args, **kwargs):
         file_obj = request.FILES.get("image")
         validation_error = self._validate_upload(file_obj)
         if validation_error:
             return Response({"error": validation_error}, status=400)
+
+        requested_fields, fields_error = self._parse_requested_fields(request)
+        if fields_error:
+            return Response({"error": fields_error}, status=400)
 
         try:
             fs = FileSystemStorage(location=os.path.join(settings.MEDIA_ROOT, "documents"))
@@ -98,7 +158,10 @@ class OCRView(APIView):
                 return Response({"error": "Invalid image file."}, status=400)
 
             # --- DELEGATE TO THE OCR ENGINE ---
-            profile, crops_data, aligned_img = extractor.process_image(original_img)
+            profile, crops_data, aligned_img = extractor.process_image(
+                original_img,
+                output_fields=requested_fields,
+            )
             # ----------------------------------
 
             unique_id = uuid.uuid4().hex[:8]
@@ -115,7 +178,9 @@ class OCRView(APIView):
             return Response(
                 {
                     "status": "success",
+                    "data": profile,
                     "profile": profile,
+                    "selected_fields": requested_fields,
                     "debug_crops": debug_urls,
                     "image_url": f"{settings.MEDIA_URL}documents/{aligned_filename}",
                 },

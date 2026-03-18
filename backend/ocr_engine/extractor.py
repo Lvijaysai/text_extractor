@@ -8,6 +8,13 @@ import numpy as np
 from .crop_refiner import refine_field_crop
 from .layout_detector import resolve_dynamic_rois
 from .ocr_runner import run_ocr_on_region, run_ocr_on_region_detailed
+from .output_fields import (
+    DEFAULT_OUTPUT_FIELDS,
+    ENGINE_FIELDS,
+    filter_profile_payload,
+    public_engine_fields,
+    required_engine_fields,
+)
 from .postprocess import (
     format_dob_from_parts,
     normalize_address_line,
@@ -20,7 +27,7 @@ from .preprocess import (
     resize_to_fixed,
     to_clean_grayscale,
 )
-from .roi import ROIS, absolute_roi, crop_absolute_roi, crop_roi
+from .roi import absolute_roi, crop_absolute_roi, crop_roi
 
 GENDER_BOX_WINDOWS = {
     "Male": (0.10, 0.66, 0.14, 0.98),
@@ -806,10 +813,13 @@ def _extract_field_payload(field, base_crop, clean_crop):
 class VisionOCRExtractor:
     """The central orchestrator for the document extraction pipeline."""
 
-    def process_image(self, original_img):
+    def process_image(self, original_img, output_fields=None):
         aligned_img = resize_to_fixed(original_img)
         clean_img = to_clean_grayscale(aligned_img)
         dynamic_rois = resolve_dynamic_rois(aligned_img, clean_img)
+        requested_output_fields = tuple(output_fields or DEFAULT_OUTPUT_FIELDS)
+        required_fields = required_engine_fields(requested_output_fields) or ENGINE_FIELDS
+        visible_fields = public_engine_fields(requested_output_fields) or required_fields
 
         profile = {
             "name": "",
@@ -818,7 +828,7 @@ class VisionOCRExtractor:
             "gender": "Male",
             "pin": "",
             "state": "",
-            "address": {},
+            "address": "",
         }
 
         crops_data = {}
@@ -826,7 +836,7 @@ class VisionOCRExtractor:
         confidences = {}
         address_lines = []
 
-        for field in ROIS:
+        for field in required_fields:
             roi = dynamic_rois.get(field, absolute_roi(aligned_img.shape, field))
 
             if roi == absolute_roi(aligned_img.shape, field):
@@ -927,4 +937,15 @@ class VisionOCRExtractor:
             "raw_extracted_text": raw_texts,
         }
 
-        return formatted_profile, crops_data, aligned_img
+        filtered_profile = filter_profile_payload(
+            formatted_profile,
+            requested_output_fields,
+            visible_fields,
+        )
+        filtered_crops = {
+            field: crop
+            for field, crop in crops_data.items()
+            if field in visible_fields
+        }
+
+        return filtered_profile, filtered_crops, aligned_img

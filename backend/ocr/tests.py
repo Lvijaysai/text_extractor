@@ -1,9 +1,11 @@
 #backend/ocr/tests.py
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
 from django.test import SimpleTestCase
 
+from ocr.views import OCRView
 from ocr_engine.crop_refiner import refine_field_crop
 from ocr_engine.extractor import VisionOCRExtractor, _resolve_gender_from_checkbox_scores
 from ocr_engine.layout_detector import build_dynamic_rois_from_details
@@ -336,3 +338,62 @@ class VisionOCRExtractorTests(SimpleTestCase):
         self.assertEqual(profile["location"]["state"], "KARNATAKA")
         self.assertEqual(crops_data["name"].shape, (8, 8, 3))
         self.assertEqual(aligned_img.shape, (10, 10, 3))
+
+    @patch("ocr_engine.extractor.resize_to_fixed", side_effect=lambda image: image)
+    @patch("ocr_engine.extractor.to_clean_grayscale", side_effect=lambda image: image)
+    @patch(
+        "ocr_engine.extractor.crop_roi",
+        side_effect=lambda image, field: np.zeros((10, 10, 3), dtype=np.uint8),
+    )
+    @patch("ocr_engine.extractor._extract_text_field")
+    @patch("ocr_engine.extractor._extract_dob_field")
+    def test_process_image_can_filter_requested_output_fields(
+        self,
+        mock_extract_dob,
+        mock_extract_text,
+        _mock_crop_roi,
+        _mock_to_clean_grayscale,
+        _mock_resize_to_fixed,
+    ):
+        mock_extract_text.side_effect = lambda field, base_crop, clean_crop: {
+            "name": ("NARASEMHAPPA", "NARASEMHAPPA", 0.93, base_crop),
+        }[field]
+        mock_extract_dob.return_value = (
+            "01 01 145Y",
+            "01/01/1957",
+            0.88,
+            np.zeros((10, 10, 3), dtype=np.uint8),
+        )
+
+        profile, crops_data, aligned_img = VisionOCRExtractor().process_image(
+            np.zeros((10, 10, 3), dtype=np.uint8),
+            output_fields=["full_name", "dob", "confidence_metrics"],
+        )
+
+        self.assertEqual(
+            set(profile),
+            {"full_name", "dob", "confidence_metrics"},
+        )
+        self.assertEqual(profile["full_name"], "NARASEMHAPPA")
+        self.assertEqual(profile["dob"], "01/01/1957")
+        self.assertEqual(set(profile["confidence_metrics"]), {"name", "dob"})
+        self.assertEqual(set(crops_data), {"name", "dob"})
+        self.assertEqual(aligned_img.shape, (10, 10, 3))
+
+
+class OCRViewTests(SimpleTestCase):
+    def test_parse_requested_fields_accepts_json_array(self):
+        fields, error = OCRView()._parse_requested_fields(
+            SimpleNamespace(data={"fields": '["full_name", "dob", "raw_extracted_text"]'})
+        )
+
+        self.assertIsNone(error)
+        self.assertEqual(fields, ["full_name", "dob", "raw_extracted_text"])
+
+    def test_parse_requested_fields_requires_primary_field(self):
+        fields, error = OCRView()._parse_requested_fields(
+            SimpleNamespace(data={"fields": '["confidence_metrics", "raw_extracted_text"]'})
+        )
+
+        self.assertIsNone(fields)
+        self.assertEqual(error, "Select at least one extraction field.")

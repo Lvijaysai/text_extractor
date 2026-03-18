@@ -1,5 +1,3 @@
-export { default } from './PanFormScanner';
-/*
 import React, { useState } from 'react';
 import axios from 'axios';
 import { downloadPDF } from './ExportPDF';
@@ -37,10 +35,10 @@ function extractProfileFromJson(value) {
     throw new Error('JSON must contain an object in "data".');
   }
 
-  return { data };
+  return data;
 }
 
-function DocumentScanner() {
+function PanFormScanner() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -85,8 +83,7 @@ function DocumentScanner() {
     setJsonDraft(nextValue);
 
     try {
-      const { data } = extractProfileFromJson(nextValue);
-      setProfile(data);
+      setProfile(extractProfileFromJson(nextValue));
       setJsonError('');
     } catch (error) {
       setJsonError(error.message || 'JSON is invalid.');
@@ -98,9 +95,8 @@ function DocumentScanner() {
       return;
     }
 
-    const { data } = extractProfileFromJson(lastSyncedJson);
     setJsonDraft(lastSyncedJson);
-    setProfile(data);
+    setProfile(extractProfileFromJson(lastSyncedJson));
     setJsonError('');
   };
 
@@ -144,24 +140,97 @@ function DocumentScanner() {
   return (
     <div className="main-layout">
       <div className="content-grid">
-        {/* LEFT SIDE: UPLOAD & PREVIEW */}
         <div className="card">
           <h3>Upload PAN Application</h3>
-          <div className="file-drop-zone" onClick={() => document.getElementById('pan-form-upload').click()}>
-            <input type="file" id="pan-form-upload" hidden accept="image/*" onChange={handleFileChange} />
-            <strong>Select Handwritten Form</strong>
-            <p style={{ margin: '5px 0', fontSize: '12px', color: '#64748b' }}>
-                {selectedFile ? selectedFile.name : 'Click to browse'}
+
+          <div
+            className="file-drop-zone"
+            onClick={() => document.getElementById('pan-form-upload').click()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                document.getElementById('pan-form-upload').click();
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            <input
+              type="file"
+              id="pan-form-upload"
+              hidden
+              accept="image/*"
+              onChange={handleFileChange}
+            />
+            <strong>Select PAN Form Image</strong>
+            <p className="upload-hint">
+              {selectedFile ? selectedFile.name : 'Click to browse'}
             </p>
           </div>
-          
-          <button onClick={handleScan} disabled={!selectedFile || loading} className="btn btn-primary" style={{ width: '100%' }}>
-            {loading ? "⏳ Extracting Text..." : "🚀 Extract Data"}
+
+          <div className="field-picker">
+            <div className="field-picker-header">
+              <h4>Choose What To Extract</h4>
+              <p>Select at least one main field before running OCR.</p>
+            </div>
+
+            <div className="field-option-grid">
+              {PRIMARY_FIELD_OPTIONS.map((field) => (
+                <label className="field-option" key={field.key}>
+                  <input
+                    type="checkbox"
+                    checked={selectedFields.includes(field.key)}
+                    onChange={() => handleFieldToggle(field.key)}
+                  />
+                  <span>
+                    <strong>{field.label}</strong>
+                    <small>{field.description}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            <div className="field-picker-header compact">
+              <h4>Extra Output Sections</h4>
+              <p>Optional metadata for review and debugging.</p>
+            </div>
+
+            <div className="field-option-grid compact">
+              {METADATA_FIELD_OPTIONS.map((field) => (
+                <label className="field-option" key={field.key}>
+                  <input
+                    type="checkbox"
+                    checked={selectedFields.includes(field.key)}
+                    onChange={() => handleFieldToggle(field.key)}
+                  />
+                  <span>
+                    <strong>{field.label}</strong>
+                    <small>{field.description}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {selectedPrimaryCount === 0 && (
+            <div className="form-warning">
+              Select at least one extraction field to enable scanning.
+            </div>
+          )}
+
+          {requestError && <div className="form-error">{requestError}</div>}
+
+          <button
+            onClick={handleScan}
+            disabled={!selectedFile || loading || selectedPrimaryCount === 0}
+            className="btn btn-primary"
+            style={{ width: '100%' }}
+          >
+            {loading ? 'Extracting data...' : 'Extract Data'}
           </button>
 
           <div className="image-frame" style={{ marginTop: '20px' }}>
             {detectionImage ? (
-              <img src={detectionImage} alt="AI Analysis" className="doc-image" />
+              <img src={detectionImage} alt="Aligned form" className="doc-image" />
             ) : preview ? (
               <img src={preview} alt="Preview" className="doc-image" />
             ) : (
@@ -170,51 +239,44 @@ function DocumentScanner() {
           </div>
         </div>
 
-        {/* RIGHT SIDE: EXTRACTED DATA */}
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h3 style={{ margin: 0 }}>Extracted Profile Data</h3>
-            
-            {/* Show Download button only if profile exists */}
+          <div className="editor-header">
+            <h3 style={{ margin: 0 }}>Editable JSON Output</h3>
+
             {profile && (
-              <button
-                onClick={() => downloadPDF(profile)}
-                style={{
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '12px'
-                }}
-              >
-                📄 Download PDF
-              </button>
+              <div className="editor-actions">
+                <button type="button" onClick={handleResetJson} className="btn btn-outline btn-small">
+                  Reset JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="btn btn-primary btn-small"
+                  disabled={Boolean(jsonError)}
+                >
+                  Download PDF
+                </button>
+              </div>
             )}
           </div>
 
           {profile ? (
-            <div style={{ 
-              backgroundColor: '#1e293b', 
-              borderRadius: '8px', 
-              padding: '24px',
-              overflowX: 'auto' 
-            }}>
-              <pre style={{ 
-                margin: 0, 
-                color: '#10b981', 
-                fontFamily: 'monospace',
-                fontSize: '14px',
-                whiteSpace: 'pre-wrap' 
-              }}>
-                {JSON.stringify({ status: "success", data: profile }, null, 2)}
-              </pre>
+            <div className="json-editor-shell">
+              <textarea
+                className="json-editor"
+                value={jsonDraft}
+                onChange={handleJsonChange}
+                spellCheck={false}
+              />
+              <div className="editor-note">
+                {jsonError
+                  ? `JSON error: ${jsonError}`
+                  : 'The latest valid JSON in this editor is used for export.'}
+              </div>
             </div>
           ) : (
             <div className="empty-state">
-              <p>Upload a form and extract data to see the JSON payload here.</p>
+              <p>Upload a form, choose the fields, and run OCR to edit the JSON here.</p>
             </div>
           )}
         </div>
@@ -223,5 +285,4 @@ function DocumentScanner() {
   );
 }
 
-export default DocumentScanner;
-*/
+export default PanFormScanner;
