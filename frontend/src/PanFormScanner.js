@@ -61,6 +61,10 @@ function PanFormScanner() {
       return;
     }
 
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
+
     setSelectedFile(file);
     setPreview(URL.createObjectURL(file));
     setDetectionImage(null);

@@ -760,53 +760,24 @@ def _refine_address_with_known_names(address_dict, known_names):
 
 
 def _extract_field_payload(field, base_crop, clean_crop):
-    if field == "dob":
-        raw_text, clean_text, confidence, debug_crop = _extract_dob_field(
-            base_crop,
-            clean_crop,
-        )
-        return {
-            "raw_text": raw_text,
-            "clean_text": clean_text,
-            "confidence": confidence,
-            "debug_crop": debug_crop,
-            "address_lines": [],
-        }
+    # 1. Map fields to their specific extractor functions
+    extractors = {
+        "dob": lambda: _extract_dob_field(base_crop, clean_crop),
+        "gender": lambda: _extract_gender_field(base_crop),
+        "address": lambda: _extract_address_field(base_crop, clean_crop),
+    }
 
-    if field == "gender":
-        raw_text, clean_text, confidence, debug_crop = _extract_gender_field(base_crop)
-        return {
-            "raw_text": raw_text,
-            "clean_text": clean_text,
-            "confidence": confidence,
-            "debug_crop": debug_crop,
-            "address_lines": [],
-        }
-
-    if field == "address":
-        raw_text, clean_text, confidence, address_lines, debug_crop = _extract_address_field(
-            base_crop,
-            clean_crop,
-        )
-        return {
-            "raw_text": raw_text,
-            "clean_text": clean_text,
-            "confidence": confidence,
-            "debug_crop": debug_crop,
-            "address_lines": address_lines,
-        }
-
-    raw_text, clean_text, confidence, debug_crop = _extract_text_field(
-        field,
-        base_crop,
-        clean_crop,
-    )
+    # 2. Get the specific function, or fallback to the generic text extractor
+    extractor_func = extractors.get(field, lambda: _extract_text_field(field, base_crop, clean_crop))
+    result = extractor_func()
+    
+    # 3. Dynamically pack the dictionary (Address returns 5 items, the rest return 4)
     return {
-        "raw_text": raw_text,
-        "clean_text": clean_text,
-        "confidence": confidence,
-        "debug_crop": debug_crop,
-        "address_lines": [],
+        "raw_text": result[0],
+        "clean_text": result[1],
+        "confidence": result[2],
+        "address_lines": result[3] if field == "address" else [],
+        "debug_crop": result[-1], # The crop is always the last item returned
     }
 
 

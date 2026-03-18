@@ -1,6 +1,7 @@
 # backend/ocr_engine/ocr_runner.py
 import logging
-
+import cv2
+import numpy as np
 from paddleocr import PaddleOCR
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,25 @@ def _sort_key(item):
 
 def run_ocr_on_region_detailed(img, detect_text=True):
     """Runs PaddleOCR and returns joined text, confidence, and per-line metadata."""
+    # 1. SAFELY HANDLE EMPTY IMAGES
+    if img is None or img.size == 0 or img.shape[0] == 0 or img.shape[1] == 0:
+        return "", 0.0, []
+
+    # 2. PADDLEOCR BUG FIX: If det=False, the recognizer crashes on square/vertical images.
+    # We must force the image to be horizontally wide to prevent the CNN from collapsing.
+    if not detect_text:
+        h, w = img.shape[:2]
+        min_width = int(h * 1.5)
+        if w < min_width:
+            pad_w = min_width - w
+            left_pad = pad_w // 2
+            right_pad = pad_w - left_pad
+            # Add white padding to the left and right to make it a wide rectangle
+            img = cv2.copyMakeBorder(
+                img, 0, 0, left_pad, right_pad, 
+                cv2.BORDER_CONSTANT, value=(255, 255, 255)
+            )
+
     raw = reader.ocr(img, cls=False, det=detect_text)
 
     if not raw or not raw[0]:

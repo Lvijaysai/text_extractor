@@ -110,14 +110,9 @@ def _fuzzy_match_choice(text, choices, min_ratio=0.78):
 
 
 def _normalize_digit_text(text):
-    normalized = []
-    for char in text.upper():
-        if char.isdigit():
-            normalized.append(char)
-        elif char in DIGIT_LIKE_LETTERS:
-            normalized.append(DIGIT_LIKE_LETTERS[char])
-    return "".join(normalized)
-
+    DIGIT_TRANSLATION = str.maketrans(DIGIT_LIKE_LETTERS)
+    # Translates characters, then strips out anything that isn't a digit (\D)
+    return re.sub(r"\D", "", text.upper().translate(DIGIT_TRANSLATION))
 
 def _pin_token_to_digits(token, include_weak_ones=False):
     strong_map = {

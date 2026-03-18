@@ -79,12 +79,8 @@ def _normalize_anchor_text(text):
 
 
 def _box_bounds(box):
-    x1 = int(min(point[0] for point in box))
-    y1 = int(min(point[1] for point in box))
-    x2 = int(max(point[0] for point in box))
-    y2 = int(max(point[1] for point in box))
-    return x1, y1, x2, y2
-
+    pts = np.array(box)
+    return int(pts[:, 0].min()), int(pts[:, 1].min()), int(pts[:, 0].max()), int(pts[:, 1].max())
 
 def _anchor_phrase_score(text, phrase):
     normalized_text = _normalize_anchor_text(text)

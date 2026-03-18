@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import ChequeValidator from './ChequeValidator';
 import PanFormScanner from './PanFormScanner';
+import TemplateCalibrator from './TemplateCalibrator'; // <-- 1. Import it
 import './App.css'; 
 
 function App() {
@@ -27,11 +28,20 @@ function App() {
         >
           PAN Form Extraction
         </button>
+        {/* 2. Add the Calibrator Button */}
+        <button 
+          className={`tab-btn ${activeTab === 'calibrator' ? 'active' : ''}`}
+          onClick={() => setActiveTab('calibrator')}
+        >
+          ⚙️ ROI Calibrator
+        </button>
       </nav>
 
       <main style={{ padding: '20px', backgroundColor: '#f8fafc', minHeight: '85vh' }}>
-        {/* Render the correct tool based on the clicked tab */}
-        {activeTab === 'cheque' ? <ChequeValidator /> : <PanFormScanner />}
+        {/* 3. Render the correct tool */}
+        {activeTab === 'cheque' && <ChequeValidator />}
+        {activeTab === 'pan' && <PanFormScanner />}
+        {activeTab === 'calibrator' && <TemplateCalibrator />}
       </main>
     </div>
   );

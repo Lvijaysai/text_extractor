@@ -12,6 +12,10 @@ function ChequeValidator() {
   const handleFileChange = (e, type) => {
     const file = e.target.files[0];
     if (file) {
+      // 🧹 MEMORY LEAK FIX
+      if (previews[type]) {
+        URL.revokeObjectURL(previews[type]);
+      }
       setFiles({ ...files, [type]: file });
       setPreviews({ ...previews, [type]: URL.createObjectURL(file) });
     }
